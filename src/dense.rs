@@ -61,11 +61,19 @@ impl<T: VectorScalar> DenseVectorArray<T> {
     /// - The array is empty and dimension cannot be determined
     /// - The dimension is 0
     /// - The inner values array is not of type T
-    pub fn new(inner: FixedSizeListArray) -> Result<Self> {
+    /// - The array contains null values
+    pub fn try_new(inner: FixedSizeListArray) -> Result<Self> {
         // Validate dimension
         let dimension = inner.value_length() as usize;
         if dimension == 0 {
             return Err(NarrowError::InvalidDimension(dimension));
+        }
+
+        // Validate no null values
+        if inner.null_count() > 0 {
+            return Err(NarrowError::NullNotSupported(
+                "DenseVectorArray does not support null vectors".to_string(),
+            ));
         }
 
         // Validate inner array type
@@ -120,7 +128,7 @@ impl<T: VectorScalar> DenseVectorArray<T> {
             None, // No nulls for now
         );
 
-        Self::new(inner)
+        Self::try_new(inner)
     }
 
     /// Get the dimension of vectors in this array.
@@ -272,5 +280,33 @@ mod tests {
         let vectors: Vec<Vec<f32>> = vec![vec![]];
         let result = DenseVectorArrayF32::from_vecs(&vectors, 0);
         assert!(matches!(result, Err(NarrowError::InvalidDimension(0))));
+    }
+
+    #[test]
+    fn test_null_rejection() {
+        use arrow::array::{Array, Float32Array};
+        use arrow::buffer::NullBuffer;
+        use arrow::datatypes::{DataType, Field};
+        use std::sync::Arc;
+
+        // Create a Float32Array with some data
+        let values = Float32Array::from(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+
+        // Create a FixedSizeListArray with a null value
+        let field = Arc::new(Field::new("item", DataType::Float32, false));
+
+        // Create null buffer with one null at index 1
+        let null_buffer = NullBuffer::from(vec![true, false, true]);
+
+        let array = FixedSizeListArray::new(
+            field,
+            2, // dimension
+            Arc::new(values),
+            Some(null_buffer),
+        );
+
+        // Should reject arrays with nulls
+        let result = DenseVectorArrayF32::try_new(array);
+        assert!(matches!(result, Err(NarrowError::NullNotSupported(_))));
     }
 }

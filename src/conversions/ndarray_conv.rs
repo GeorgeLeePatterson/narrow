@@ -219,7 +219,7 @@ mod tests {
 
         // Slice to get the middle element
         let sliced = original.as_arrow().slice(1, 1);
-        let sliced_narrow = DenseVectorArrayF32::new(sliced).unwrap();
+        let sliced_narrow = DenseVectorArrayF32::try_new(sliced).unwrap();
 
         let matrix = sliced_narrow.as_ndarray().unwrap();
 
@@ -241,7 +241,7 @@ mod tests {
 
         // Slice to get the last element
         let sliced = original.as_arrow().slice(2, 1);
-        let sliced_narrow = DenseVectorArrayF32::new(sliced).unwrap();
+        let sliced_narrow = DenseVectorArrayF32::try_new(sliced).unwrap();
 
         let vec = sliced_narrow.ndarray_view(0).unwrap();
 

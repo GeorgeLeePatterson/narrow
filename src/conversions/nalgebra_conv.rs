@@ -287,7 +287,7 @@ mod tests {
 
         // Slice to get the last two elements
         let sliced = original.as_arrow().slice(1, 2);
-        let sliced_narrow = DenseVectorArrayF32::new(sliced).unwrap();
+        let sliced_narrow = DenseVectorArrayF32::try_new(sliced).unwrap();
 
         let matrix = sliced_narrow.to_nalgebra_matrix().unwrap();
 
@@ -309,7 +309,7 @@ mod tests {
 
         // Slice to get the middle element
         let sliced = original.as_arrow().slice(1, 1);
-        let sliced_narrow = DenseVectorArrayF32::new(sliced).unwrap();
+        let sliced_narrow = DenseVectorArrayF32::try_new(sliced).unwrap();
 
         let vec = sliced_narrow.to_nalgebra_vector(0).unwrap();
 
@@ -330,7 +330,7 @@ mod tests {
 
         // Slice to get the first element
         let sliced = original.as_arrow().slice(0, 1);
-        let sliced_narrow = DenseVectorArrayF32::new(sliced).unwrap();
+        let sliced_narrow = DenseVectorArrayF32::try_new(sliced).unwrap();
 
         let view = sliced_narrow.nalgebra_view(0).unwrap();
 

@@ -50,7 +50,7 @@ impl<T: VectorScalar> DenseVectorArray<T> {
             None,
         );
 
-        Self::new(result_array)
+        Self::try_new(result_array)
     }
 
     /// Element-wise subtraction of two vector arrays.
@@ -82,7 +82,7 @@ impl<T: VectorScalar> DenseVectorArray<T> {
             None,
         );
 
-        Self::new(result_array)
+        Self::try_new(result_array)
     }
 
     /// Scalar multiplication of a vector array.
@@ -114,7 +114,7 @@ impl<T: VectorScalar> DenseVectorArray<T> {
             None,
         );
 
-        Self::new(result_array)
+        Self::try_new(result_array)
     }
 
     /// Element-wise (Hadamard) product of two vector arrays.
@@ -146,7 +146,7 @@ impl<T: VectorScalar> DenseVectorArray<T> {
             None,
         );
 
-        Self::new(result_array)
+        Self::try_new(result_array)
     }
 }
 
@@ -259,8 +259,8 @@ mod tests {
         let a_sliced = a.as_arrow().slice(1, 1);
         let b_sliced = b.as_arrow().slice(1, 1);
 
-        let a_narrow = DenseVectorArrayF32::new(a_sliced).unwrap();
-        let b_narrow = DenseVectorArrayF32::new(b_sliced).unwrap();
+        let a_narrow = DenseVectorArrayF32::try_new(a_sliced).unwrap();
+        let b_narrow = DenseVectorArrayF32::try_new(b_sliced).unwrap();
 
         // Perform addition on sliced arrays
         let result = a_narrow.add(&b_narrow).unwrap();
@@ -282,7 +282,7 @@ mod tests {
 
         // Slice to get the last element
         let a_sliced = a.as_arrow().slice(2, 1);
-        let a_narrow = DenseVectorArrayF32::new(a_sliced).unwrap();
+        let a_narrow = DenseVectorArrayF32::try_new(a_sliced).unwrap();
 
         let result = a_narrow.scalar_multiply(2.0).unwrap();
 
