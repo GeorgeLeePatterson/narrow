@@ -1,0 +1,65 @@
+# Configuration for PR labeler action
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.md'
+      - 'docs/**'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '**/Cargo.toml'
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**'
+
+tests:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'tests/**'
+      - '**/tests/**'
+      - '**/*test*'
+
+benchmarks:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'benches/**'
+      - '**/benches/**'
+
+examples:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'examples/**'
+      - '**/examples/**'
+
+# narrow-specific labels
+dense-vectors:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/dense.rs'
+      - '**/dense/**'
+
+conversions:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/conversions/**'
+      - '**/ndarray_conv.rs'
+      - '**/nalgebra_conv.rs'
+
+operations:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/ops/**'
+      - '**/arithmetic.rs'
+      - '**/similarity.rs'
+
+datafusion:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/datafusion/**'
+      - '**/udf*'
