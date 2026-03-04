@@ -1,0 +1,70 @@
+name: PR
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, labeled]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: write
+
+jobs:
+  # ── Auto-label PRs ──
+  label:
+    name: label
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/labeler@v5
+        with:
+          configuration-path: .github/labeler.yml
+
+  # ── Validate PR title (conventional commits) ──
+  validate-title:
+    name: validate-title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            fix
+            feat
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+
+  # ── Auto-merge dependabot patches ──
+  auto-merge-dependabot:
+    name: auto-merge-dependabot
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Approve patch updates
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge patch updates
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

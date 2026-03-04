@@ -1,0 +1,26 @@
+edition = "2024"
+style_edition = "2024"
+unstable_features = true
+
+# Import organization
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+
+# Widths
+max_width = 100
+comment_width = 100
+wrap_comments = true
+fn_call_width = 90
+attr_fn_like_width = 90
+struct_lit_width = 90
+chain_width = 90
+array_width = 90
+single_line_if_else_max_width = 90
+
+# Formatting choices
+use_field_init_shorthand = true
+format_strings = false
+format_macro_matchers = true
+reorder_impl_items = true
+enum_discrim_align_threshold = 60
+struct_field_align_threshold = 40

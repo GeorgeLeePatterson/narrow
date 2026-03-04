@@ -1,0 +1,34 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/Cargo.toml'
+          - '**/Cargo.lock'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**'
+          - '**/*test*'
+
+benchmarks:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'benches/**'
+          - '**/benches/**'
+
+release:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'RELEASE_NOTES.md'
+          - 'CHANGELOG.md'

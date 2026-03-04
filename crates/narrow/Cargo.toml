@@ -1,0 +1,38 @@
+[package]
+name = "narrow"
+description = "Zero-copy bridge between Apache Arrow and ndarray"
+keywords = ["arrow", "ndarray", "linear-algebra", "zero-copy", "interop"]
+categories = ["mathematics", "science", "data-structures"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+
+[dependencies]
+arrow = { workspace = true }
+arrow-array = { workspace = true }
+arrow-buffer = { workspace = true }
+arrow-schema = { workspace = true }
+ndarray = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }
+proptest = { workspace = true }
+
+[[bench]]
+name = "inbound_benchmarks"
+harness = false
+
+[[bench]]
+name = "outbound_benchmarks"
+harness = false
+
+[lints]
+workspace = true

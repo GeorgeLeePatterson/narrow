@@ -1,14 +1,84 @@
-[package]
-name = "narrow"
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["George Lee Patterson <patterson.george@gmail.com>"]
-description = "Linear algebra for Arrow data"
 license = "Apache-2.0"
-keywords = ["arrow", "linear-algebra", "nalgebra", "math", "vector"]
-categories = ["mathematics"]
 repository = "https://github.com/georgeleepatterson/narrow"
 homepage = "https://github.com/georgeleepatterson/narrow"
 documentation = "https://docs.rs/narrow"
 
-[dependencies]
+[workspace.dependencies]
+# Arrow
+arrow = "55"
+arrow-array = "55"
+arrow-buffer = "55"
+arrow-schema = { version = "55", features = ["canonical_extension_types"] }
+
+# Ndarray
+ndarray = "0.17"
+
+# Testing
+approx = "0.5"
+criterion = "0.8"
+proptest = "1"
+
+# Error handling
+thiserror = "2"
+
+# Serialization (for extension type metadata)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# ─── Profiles ───
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+[profile.release-with-debug]
+inherits = "release"
+debug = 2
+
+[profile.release-lto]
+inherits = "release"
+lto = "fat"
+
+[profile.instruments]
+inherits = "release"
+debug = true
+strip = false
+
+[profile.ci]
+inherits = "dev"
+incremental = false
+
+# ─── Lints ───
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+large_futures = "warn"
+clone_on_ref_ptr = "warn"
+# Allow common pedantic exceptions
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_lossless = "allow"
+
+[workspace.lints.rust]
+unused_imports = "warn"
+unused_variables = "warn"
+dead_code = "warn"
+elided_lifetimes_in_paths = "warn"
+unsafe_op_in_unsafe_fn = "warn"
+unreachable_pub = "warn"

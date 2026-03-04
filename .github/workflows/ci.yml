@@ -1,0 +1,251 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: '-C debuginfo=line-tables-only -C incremental=false'
+
+jobs:
+  # ── Detect changes ──
+  changes:
+    name: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+              - '.github/workflows/ci.yml'
+              - '.justfile'
+              - 'rustfmt.toml'
+              - 'clippy.toml'
+
+  # ── Check (fmt + clippy + compile) ──
+  check:
+    name: check
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install Rust nightly (for rustfmt)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-check-
+
+      - name: Check formatting
+        run: cargo +nightly fmt -- --check
+
+      - name: Clippy (no default features)
+        run: cargo +stable clippy --workspace --no-default-features -- -D warnings
+
+      - name: Clippy (all features)
+        run: cargo +stable clippy --workspace --all-features -- -D warnings
+
+      - name: Compile check (no default features)
+        run: cargo +stable check --workspace --no-default-features
+
+      - name: Compile check (all features)
+        run: cargo +stable check --workspace --all-features
+
+  # ── Unit tests ──
+  test-unit:
+    name: test-unit
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
+      - name: Unit tests
+        run: cargo test --workspace --lib -- --nocapture --show-output
+
+  # ── Integration tests ──
+  test-integration:
+    name: test-integration
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
+      - name: Integration tests
+        run: cargo test -p narrow --tests -- --nocapture --show-output
+
+  # ── Coverage ──
+  coverage:
+    name: coverage
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cov-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cov-
+
+      - name: Generate coverage
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --workspace --lib --tests --no-report
+          cargo llvm-cov report --fail-under-lines 90 --lcov --output-path coverage/lcov.info
+
+      - name: Upload coverage to Codecov
+        if: github.event_name != 'pull_request'
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage/lcov.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ── Benchmark smoke ──
+  benchmark-smoke:
+    name: benchmark-smoke
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bench-
+
+      - name: Restore benchmark baseline
+        uses: actions/cache/restore@v4
+        with:
+          path: target/criterion
+          key: ${{ runner.os }}-bench-baseline-${{ github.ref_name }}
+          restore-keys: |
+            ${{ runner.os }}-bench-baseline-main
+
+      - name: Run benchmark smoke tests
+        run: cargo bench --workspace -- --warm-up-time 1 --measurement-time 2 --sample-size 10
+
+      - name: Save benchmark baseline
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: target/criterion
+          key: ${{ runner.os }}-bench-baseline-${{ github.ref_name }}-${{ github.sha }}
+
+  # ── Summary ──
+  ci-success:
+    name: ci-success
+    if: always()
+    needs: [changes, check, test-unit, test-integration, coverage, benchmark-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate CI result
+        run: |
+          if [[ "${{ needs.changes.outputs.code }}" != "true" ]]; then
+            echo "Documentation-only change. CI gates skipped."
+            exit 0
+          fi
+
+          RESULTS=(
+            "${{ needs.check.result }}"
+            "${{ needs.test-unit.result }}"
+            "${{ needs.test-integration.result }}"
+            "${{ needs.coverage.result }}"
+            "${{ needs.benchmark-smoke.result }}"
+          )
+
+          for result in "${RESULTS[@]}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "CI failed: at least one job did not succeed ($result)"
+              exit 1
+            fi
+          done
+
+          echo "All CI gates passed."
