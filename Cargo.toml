@@ -14,7 +14,7 @@ documentation = "https://docs.rs/ndarrow"
 
 [workspace.dependencies]
 # Arrow
-arrow = "55"
+arrow = "58"
 arrow-array = "55"
 arrow-buffer = "55"
 arrow-schema = { version = "55", features = ["canonical_extension_types"] }
