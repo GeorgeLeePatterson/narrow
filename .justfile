@@ -116,7 +116,8 @@ bench-smoke:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running benchmark smoke tests..."
-    cargo bench --workspace -- --warm-up-time 1 --measurement-time 2 --sample-size 10
+    cargo bench -p ndarrow --bench inbound_benchmarks -- --warm-up-time 1 --measurement-time 2 --sample-size 10
+    cargo bench -p ndarrow --bench outbound_benchmarks -- --warm-up-time 1 --measurement-time 2 --sample-size 10
     echo "Benchmark smoke tests complete."
 
 bench-report:

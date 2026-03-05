@@ -218,7 +218,7 @@ jobs:
             ${{ runner.os }}-bench-baseline-main
 
       - name: Run benchmark smoke tests
-        run: cargo bench --workspace -- --warm-up-time 1 --measurement-time 2 --sample-size 10
+        run: just bench-smoke
 
       - name: Save benchmark baseline
         if: github.ref == 'refs/heads/main'
