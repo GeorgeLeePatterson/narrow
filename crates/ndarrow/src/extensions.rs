@@ -12,6 +12,7 @@ use crate::{
     complex::{Complex32Extension, Complex64Extension},
     error::NdarrowError,
     sparse::CsrMatrixExtension,
+    tensor::{parse_fixed_shape_extension, parse_variable_shape_extension},
 };
 
 /// A deserialized extension type supported by ndarrow.
@@ -78,14 +79,12 @@ pub fn deserialize_registered_extension(
             .try_extension_type::<CsrMatrixExtension>()
             .map(RegisteredExtension::CsrMatrix)
             .map_err(NdarrowError::from),
-        FixedShapeTensor::NAME => field
-            .try_extension_type::<FixedShapeTensor>()
-            .map(RegisteredExtension::FixedShapeTensor)
-            .map_err(NdarrowError::from),
-        VariableShapeTensor::NAME => field
-            .try_extension_type::<VariableShapeTensor>()
-            .map(RegisteredExtension::VariableShapeTensor)
-            .map_err(NdarrowError::from),
+        FixedShapeTensor::NAME => {
+            parse_fixed_shape_extension(field).map(RegisteredExtension::FixedShapeTensor)
+        }
+        VariableShapeTensor::NAME => {
+            parse_variable_shape_extension(field).map(RegisteredExtension::VariableShapeTensor)
+        }
         Complex32Extension::NAME => field
             .try_extension_type::<Complex32Extension>()
             .map(RegisteredExtension::Complex32)

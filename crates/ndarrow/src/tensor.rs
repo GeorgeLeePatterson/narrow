@@ -12,21 +12,61 @@ use arrow_array::{
 };
 use arrow_buffer::{OffsetBuffer, ScalarBuffer};
 use arrow_schema::{
-    DataType, Field,
-    extension::{ExtensionType, FixedShapeTensor, VariableShapeTensor},
+    ArrowError, DataType, Field,
+    extension::{
+        EXTENSION_TYPE_METADATA_KEY, EXTENSION_TYPE_NAME_KEY, ExtensionType, FixedShapeTensor,
+        VariableShapeTensor,
+    },
 };
 use ndarray::{ArrayD, ArrayViewD, IxDyn};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{element::NdarrowElement, error::NdarrowError};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct FixedShapeTensorWireMetadata {
-    shape: Vec<usize>,
+    shape:        Vec<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dim_names:    Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    permutations: Option<Vec<usize>>,
 }
 
-fn parse_fixed_shape_metadata(field: &Field) -> Result<Vec<usize>, NdarrowError> {
-    field.try_extension_type::<FixedShapeTensor>().map_err(NdarrowError::from)?;
+#[derive(Debug, Deserialize, Serialize)]
+struct VariableShapeTensorWireMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dim_names:     Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    permutations:  Option<Vec<usize>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    uniform_shape: Option<Vec<Option<i32>>>,
+}
+
+fn require_extension_name(field: &Field, expected_name: &'static str) -> Result<(), NdarrowError> {
+    match field.extension_type_name() {
+        Some(name) if name == expected_name => Ok(()),
+        Some(name) => Err(NdarrowError::Arrow(ArrowError::InvalidArgumentError(format!(
+            "Field extension type mismatch, expected {expected_name}, found {name}",
+        )))),
+        None => Err(NdarrowError::Arrow(ArrowError::InvalidArgumentError(
+            "Field extension type name missing".to_owned(),
+        ))),
+    }
+}
+
+fn field_with_extension_metadata(
+    field: Field,
+    extension_name: &'static str,
+    metadata_json: String,
+) -> Field {
+    let mut metadata = field.metadata().clone();
+    metadata.insert(EXTENSION_TYPE_NAME_KEY.to_owned(), extension_name.to_owned());
+    metadata.insert(EXTENSION_TYPE_METADATA_KEY.to_owned(), metadata_json);
+    field.with_metadata(metadata)
+}
+
+pub(crate) fn parse_fixed_shape_extension(field: &Field) -> Result<FixedShapeTensor, NdarrowError> {
+    require_extension_name(field, FixedShapeTensor::NAME)?;
 
     let raw_metadata =
         field.extension_type_metadata().ok_or_else(|| NdarrowError::InvalidMetadata {
@@ -37,6 +77,109 @@ fn parse_fixed_shape_metadata(field: &Field) -> Result<Vec<usize>, NdarrowError>
             message: format!("arrow.fixed_shape_tensor metadata parse failed: {e}"),
         })?;
 
+    let value_type = match field.data_type() {
+        DataType::FixedSizeList(item, _) => item.data_type().clone(),
+        data_type => {
+            return Err(NdarrowError::TypeMismatch {
+                message: format!(
+                    "arrow.fixed_shape_tensor requires FixedSizeList storage, found {data_type}"
+                ),
+            });
+        }
+    };
+    let extension = FixedShapeTensor::try_new(
+        value_type,
+        metadata.shape,
+        metadata.dim_names,
+        metadata.permutations,
+    )
+    .map_err(NdarrowError::from)?;
+    extension.supports_data_type(field.data_type()).map_err(NdarrowError::from)?;
+    Ok(extension)
+}
+
+pub(crate) fn parse_variable_shape_extension(
+    field: &Field,
+) -> Result<VariableShapeTensor, NdarrowError> {
+    require_extension_name(field, VariableShapeTensor::NAME)?;
+
+    let raw_metadata =
+        field.extension_type_metadata().ok_or_else(|| NdarrowError::InvalidMetadata {
+            message: "arrow.variable_shape_tensor metadata missing".to_owned(),
+        })?;
+    let metadata: VariableShapeTensorWireMetadata =
+        serde_json::from_str(raw_metadata).map_err(|e| NdarrowError::InvalidMetadata {
+            message: format!("arrow.variable_shape_tensor metadata parse failed: {e}"),
+        })?;
+
+    let (value_type, dimensions) = match field.data_type() {
+        DataType::Struct(fields) => {
+            let data_field = fields.find("data").ok_or_else(|| NdarrowError::TypeMismatch {
+                message: "arrow.variable_shape_tensor storage missing 'data' field".to_owned(),
+            })?;
+            let shape_field = fields.find("shape").ok_or_else(|| NdarrowError::TypeMismatch {
+                message: "arrow.variable_shape_tensor storage missing 'shape' field".to_owned(),
+            })?;
+            let value_type = match data_field.1.data_type() {
+                DataType::List(item) => item.data_type().clone(),
+                data_type => {
+                    return Err(NdarrowError::TypeMismatch {
+                        message: format!(
+                            "arrow.variable_shape_tensor 'data' field must be List, found {data_type}"
+                        ),
+                    });
+                }
+            };
+            let dimensions = match shape_field.1.data_type() {
+                DataType::FixedSizeList(_, list_size) => usize::try_from(*list_size).map_err(
+                    |_| NdarrowError::TypeMismatch {
+                        message: format!(
+                            "arrow.variable_shape_tensor shape list size must be non-negative, found {list_size}"
+                        ),
+                    },
+                )?,
+                data_type => {
+                    return Err(NdarrowError::TypeMismatch {
+                        message: format!(
+                            "arrow.variable_shape_tensor 'shape' field must be FixedSizeList, found {data_type}"
+                        ),
+                    });
+                }
+            };
+            (value_type, dimensions)
+        }
+        data_type => {
+            return Err(NdarrowError::TypeMismatch {
+                message: format!(
+                    "arrow.variable_shape_tensor requires Struct storage, found {data_type}"
+                ),
+            });
+        }
+    };
+
+    let extension = VariableShapeTensor::try_new(
+        value_type,
+        dimensions,
+        metadata.dim_names,
+        metadata.permutations,
+        metadata.uniform_shape,
+    )
+    .map_err(NdarrowError::from)?;
+    extension.supports_data_type(field.data_type()).map_err(NdarrowError::from)?;
+    Ok(extension)
+}
+
+fn parse_fixed_shape_metadata(field: &Field) -> Result<Vec<usize>, NdarrowError> {
+    parse_fixed_shape_extension(field)?;
+
+    let raw_metadata =
+        field.extension_type_metadata().ok_or_else(|| NdarrowError::InvalidMetadata {
+            message: "arrow.fixed_shape_tensor metadata missing".to_owned(),
+        })?;
+    let metadata: FixedShapeTensorWireMetadata =
+        serde_json::from_str(raw_metadata).map_err(|e| NdarrowError::InvalidMetadata {
+            message: format!("arrow.fixed_shape_tensor metadata parse failed: {e}"),
+        })?;
     Ok(metadata.shape)
 }
 
@@ -164,10 +307,22 @@ where
     })?;
     let fsl = FixedSizeListArray::new(item_field, value_length, Arc::new(values_array), None);
 
-    let extension = FixedShapeTensor::try_new(T::data_type(), tensor_shape, None, None)
+    let extension = FixedShapeTensor::try_new(T::data_type(), tensor_shape.clone(), None, None)
         .map_err(NdarrowError::from)?;
-    let mut field = Field::new(field_name, fsl.data_type().clone(), false);
-    field.try_with_extension_type(extension).map_err(NdarrowError::from)?;
+    extension.supports_data_type(fsl.data_type()).map_err(NdarrowError::from)?;
+    let metadata_json = serde_json::to_string(&FixedShapeTensorWireMetadata {
+        shape:        tensor_shape,
+        dim_names:    None,
+        permutations: None,
+    })
+    .map_err(|e| NdarrowError::InvalidMetadata {
+        message: format!("arrow.fixed_shape_tensor metadata serialization failed: {e}"),
+    })?;
+    let field = field_with_extension_metadata(
+        Field::new(field_name, fsl.data_type().clone(), false),
+        FixedShapeTensor::NAME,
+        metadata_json,
+    );
 
     Ok((field, fsl))
 }
@@ -302,8 +457,7 @@ where
         return Err(NdarrowError::NullsPresent { null_count: array.null_count() });
     }
 
-    let extension =
-        field.try_extension_type::<VariableShapeTensor>().map_err(NdarrowError::from)?;
+    let extension = parse_variable_shape_extension(field)?;
     extension.supports_data_type(array.data_type()).map_err(NdarrowError::from)?;
 
     let data = array
@@ -491,10 +645,22 @@ where
         StructArray::new(struct_fields.clone().into(), vec![data_list, shape_fsl], None);
 
     let extension =
-        VariableShapeTensor::try_new(T::data_type(), dimensions, None, None, uniform_shape)
+        VariableShapeTensor::try_new(T::data_type(), dimensions, None, None, uniform_shape.clone())
             .map_err(NdarrowError::from)?;
-    let mut field = Field::new(field_name, struct_array.data_type().clone(), false);
-    field.try_with_extension_type(extension).map_err(NdarrowError::from)?;
+    extension.supports_data_type(struct_array.data_type()).map_err(NdarrowError::from)?;
+    let metadata_json = serde_json::to_string(&VariableShapeTensorWireMetadata {
+        dim_names: None,
+        permutations: None,
+        uniform_shape,
+    })
+    .map_err(|e| NdarrowError::InvalidMetadata {
+        message: format!("arrow.variable_shape_tensor metadata serialization failed: {e}"),
+    })?;
+    let field = field_with_extension_metadata(
+        Field::new(field_name, struct_array.data_type().clone(), false),
+        VariableShapeTensor::NAME,
+        metadata_json,
+    );
 
     Ok((field, struct_array))
 }
@@ -525,6 +691,20 @@ mod tests {
         for (actual, expected) in view.iter().zip(data.iter()) {
             assert_abs_diff_eq!(*actual, *expected);
         }
+    }
+
+    #[test]
+    fn fixed_shape_tensor_outbound_metadata_is_arrow_parseable() {
+        let array = ArrayD::from_shape_vec(IxDyn(&[2, 2]), vec![1.0_f32, 2.0, 3.0, 4.0]).unwrap();
+        let (field, _fsl) = arrayd_to_fixed_shape_tensor("tensor", array).unwrap();
+
+        let metadata = field.extension_type_metadata().unwrap();
+        assert!(!metadata.contains("\"dim_names\":null"));
+        assert!(!metadata.contains("\"permutations\":null"));
+
+        let extension = field.try_extension_type::<FixedShapeTensor>().unwrap();
+        assert_eq!(extension.dimensions(), 1);
+        assert_eq!(extension.list_size(), 2);
     }
 
     #[test]
@@ -563,6 +743,21 @@ mod tests {
         assert_abs_diff_eq!(view1[[0, 2]], 9.0_f32);
 
         assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn variable_shape_tensor_outbound_metadata_is_arrow_parseable() {
+        let a = ArrayD::from_shape_vec(IxDyn(&[2, 2]), vec![1.0_f32, 2.0, 3.0, 4.0]).unwrap();
+        let (field, _array) =
+            arrays_to_variable_shape_tensor("ragged", vec![a], Some(vec![None, Some(2)])).unwrap();
+
+        let metadata = field.extension_type_metadata().unwrap();
+        assert!(!metadata.contains("\"dim_names\":null"));
+        assert!(!metadata.contains("\"permutations\":null"));
+
+        let extension = field.try_extension_type::<VariableShapeTensor>().unwrap();
+        assert_eq!(extension.dimensions(), 2);
+        assert_eq!(extension.uniform_shapes(), Some(&[None, Some(2)][..]));
     }
 
     #[test]
