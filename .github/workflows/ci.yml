@@ -173,13 +173,13 @@ jobs:
         run: |
           cargo llvm-cov clean --workspace
           cargo llvm-cov --workspace --lib --tests --no-report
-          cargo llvm-cov report --fail-under-lines 90 --lcov --output-path coverage/lcov.info
+          cargo llvm-cov report --fail-under-lines 90 --lcov --output-path lcov.info
 
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request'
         uses: codecov/codecov-action@v5
         with:
-          files: coverage/lcov.info
+          files: lcov.info
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
