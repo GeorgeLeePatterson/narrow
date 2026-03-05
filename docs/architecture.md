@@ -19,7 +19,10 @@ ndarrow/
         outbound.rs             # Dense ndarray -> Arrow ownership-transfer conversions + IntoArrow
         sparse.rs               # ndarrow.csr_matrix extension, CsrView, sparse inbound/outbound
         tensor.rs               # fixed/variable tensor extension inbound/outbound APIs
+        complex.rs              # complex extension types + complex inbound/outbound APIs
+        extensions.rs           # ndarrow extension registry + deserialization dispatch
         helpers.rs              # Explicit allocation helpers (cast/reshape/layout)
+        prelude.rs              # Convenience re-exports for common API surface
 ```
 
 The implementation currently uses single-file modules per capability area. Submodule splits can be
@@ -106,6 +109,8 @@ Implemented for:
 | `arrow.fixed_shape_tensor`          | `ArrayViewD<T::Native>`   | Zero  | Borrow flat buffer + shape   |
 | `arrow.variable_shape_tensor`       | Per-row `ArrayViewD`      | Zero  | Borrow slice per element     |
 | `ndarrow.csr_matrix`                 | `CsrView` / equivalent   | Zero  | Borrow offsets + indices + values |
+| `ndarrow.complex32`                 | `ArrayView1<Complex32>`   | Zero  | Borrow pair buffer + reinterpret |
+| `ndarrow.complex64`                 | `ArrayView1<Complex64>`   | Zero  | Borrow pair buffer + reinterpret |
 | Two-column sparse (indices+values)  | `CsrView` / equivalent   | Zero  | Borrow from both columns     |
 
 ### Outbound (ndarray -> Arrow)
@@ -116,6 +121,8 @@ Implemented for:
 | `Array2<T>` (M, N)  | `FixedSizeList<T>(N)`              | Zero* | `into_raw_vec()` -> buffer         |
 | `ArrayD<T>`         | `arrow.fixed_shape_tensor`          | Zero* | `into_raw_vec()` + shape metadata  |
 | Sparse owned        | `ndarrow.csr_matrix`                 | Zero* | Transfer row_ptrs, indices, values |
+| `Array1<Complex32>` | `ndarrow.complex32`                  | Zero* | Transfer pair buffer ownership     |
+| `Array1<Complex64>` | `ndarrow.complex64`                  | Zero* | Transfer pair buffer ownership     |
 
 \* Zero-copy if standard layout. Allocates `as_standard_layout()` copy if not.
 
@@ -180,6 +187,9 @@ ndarrow registers handlers for canonical extension types that have ndarray mappi
 - `arrow.variable_shape_tensor`: Extract uniform_shape from metadata, provide per-element
   `ArrayViewD` iterator.
 
+Registration/deserialization of canonical and ndarrow-defined extension handlers is centralized
+in `extensions.rs` via `deserialize_registered_extension`.
+
 ### Custom Types (ndarrow-defined)
 
 - `ndarrow.csr_matrix`:
@@ -189,6 +199,12 @@ ndarrow registers handlers for canonical extension types that have ndarray mappi
     supported NdarrowElement type.
   - ndarray mapping: `CsrView` holding borrowed `&[i32]` offsets, `&[u32]` indices,
     `&[T]` values, plus `ncols: usize`.
+
+- `ndarrow.complex32` / `ndarrow.complex64`:
+  - Storage: `FixedSizeList<Float32>(2)` / `FixedSizeList<Float64>(2)`
+  - Metadata: none
+  - Validation: fixed-size list length is exactly 2; inner primitive type must match
+  - ndarray mapping: borrowed `ArrayView1<Complex32>` / `ArrayView1<Complex64>`
 
 ## Sparse Representation
 

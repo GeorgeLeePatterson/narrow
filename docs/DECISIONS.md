@@ -124,6 +124,22 @@ Additional types (complex, integer, f16) may be added. The trait system is exten
 **Rationale**: Different producers use different types. Qdrant uses f32. Scientific computing
 often uses f64. ndarrow is vendor-agnostic and must not assume a type.
 
+### D-016: Complex Scalars Use Pair-Encoded Extension Types
+
+Complex-valued scalar columns are represented with ndarrow-defined extension types:
+- `ndarrow.complex32` over storage `FixedSizeList<Float32>(2)`
+- `ndarrow.complex64` over storage `FixedSizeList<Float64>(2)`
+
+Each element is encoded as `[real, imag]` in that order. Inbound conversion reinterprets the
+underlying primitive buffer as `Complex32`/`Complex64` without copying. Outbound conversion
+transfers ownership of an `Array1<Complex*>` buffer into Arrow storage.
+
+The child-field nullability flag is accepted for interoperability, but validated inbound paths
+reject actual inner null values.
+
+**Rationale**: Arrow has no canonical complex scalar extension type. A two-lane fixed-size list
+preserves contiguous layout, supports zero-copy reinterpretation, and remains explicit/self-describing.
+
 ## Null Handling
 
 ### D-020: Three Null Tiers
@@ -199,6 +215,8 @@ recognition without additional work.
 Where no canonical type exists, ndarrow defines extension types under the `ndarrow.` namespace.
 Currently defined:
 - `ndarrow.csr_matrix` — CSR sparse matrix
+- `ndarrow.complex32` — complex32 scalar column (real/imag pair)
+- `ndarrow.complex64` — complex64 scalar column (real/imag pair)
 
 Custom types implement the `ExtensionType` trait from `arrow_schema::extension` with proper
 serialization, deserialization, and validation.

@@ -40,9 +40,9 @@
 | Validated (null_count check)        | Done   | Default tier, returns Result                 |
 | Unchecked (caller guarantees)       | Done   | Zero-cost, unsafe                            |
 | Masked (view + validity bitmap)     | Done   | Returns tuple, zero allocation               |
-| fill_nulls(zero)                    | --     | Allocating helper                            |
-| fill_nulls(mean)                    | --     | Allocating helper, requires float type       |
-| compact_non_null                    | --     | Allocating helper, removes null rows         |
+| fill_nulls(zero)                    | Done   | `helpers::fill_nulls_with_zero`              |
+| fill_nulls(mean)                    | Done   | `helpers::fill_nulls_with_mean` (float types) |
+| compact_non_null                    | Done   | `helpers::compact_non_null`                  |
 
 ## Helpers (Explicit Allocation Points)
 
@@ -62,7 +62,9 @@
 | arrow.fixed_shape_tensor support    | Done   | Inbound + outbound implemented               |
 | arrow.variable_shape_tensor support | Done   | Inbound iterator + outbound implemented      |
 | ndarrow.csr_matrix definition       | Done   | `CsrMatrixExtension` implemented             |
-| Extension type registration         | --     | Register handlers for deserialization        |
+| ndarrow.complex32 definition        | Done   | `Complex32Extension` implemented             |
+| ndarrow.complex64 definition        | Done   | `Complex64Extension` implemented             |
+| Extension type registration         | Done   | `deserialize_registered_extension` registry  |
 
 ## Element Type Support
 
@@ -70,8 +72,8 @@
 |------------|---------|----------|-------------------------------------|
 | f32        | Done    | Done     | First-class, primary                |
 | f64        | Done    | Done     | First-class, primary                |
-| Complex32  | --      | --       | Future, pending trait bounds        |
-| Complex64  | --      | --       | Future, pending trait bounds        |
+| Complex32  | Done    | Done     | Via `ndarrow.complex32` extension APIs |
+| Complex64  | Done    | Done     | Via `ndarrow.complex64` extension APIs |
 | i32        | --      | --       | Future, for index arrays            |
 | i64        | --      | --       | Future, for index arrays            |
 | u32        | --      | --       | Future, for sparse indices          |
@@ -85,7 +87,7 @@
 | AsNdarray trait                     | Done   | Inbound conversion contract                  |
 | IntoArrow trait                     | Done   | Outbound conversion contract                 |
 | NdarrowError enum                    | Done   | Error taxonomy                               |
-| Prelude module                      | --     | Convenience re-exports                       |
+| Prelude module                      | Done   | `prelude` convenience re-exports             |
 
 ## Quality Infrastructure
 

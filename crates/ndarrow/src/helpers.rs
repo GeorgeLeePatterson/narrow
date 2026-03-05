@@ -54,6 +54,102 @@ pub fn cast_f64_to_f32(
     Ok(PrimitiveArray::new(ScalarBuffer::from(values), array.nulls().cloned()))
 }
 
+/// Fills nulls in a primitive array with the additive identity (`0`).
+///
+/// # Allocation
+///
+/// Allocates a new values buffer only when nulls are present.
+///
+/// # Does not allocate
+///
+/// Returns a cheap clone when the array has no nulls.
+#[must_use]
+pub fn fill_nulls_with_zero<T>(array: &PrimitiveArray<T>) -> PrimitiveArray<T>
+where
+    T: ArrowPrimitiveType,
+    T::Native: NdarrowElement,
+{
+    if array.null_count() == 0 {
+        return array.clone();
+    }
+
+    let values = array
+        .iter()
+        .map(|value| value.unwrap_or_else(<T::Native as num_traits::Zero>::zero))
+        .collect::<Vec<_>>();
+    PrimitiveArray::new(ScalarBuffer::from(values), None)
+}
+
+/// Fills nulls in a primitive array with the mean of non-null values.
+///
+/// # Allocation
+///
+/// Allocates a new values buffer only when nulls are present.
+///
+/// # Does not allocate
+///
+/// Returns a cheap clone when the array has no nulls.
+///
+/// # Errors
+///
+/// Returns an error when the array is entirely null (mean undefined).
+pub fn fill_nulls_with_mean<T>(array: &PrimitiveArray<T>) -> Result<PrimitiveArray<T>, NdarrowError>
+where
+    T: ArrowPrimitiveType,
+    T::Native: NdarrowElement + num_traits::Float + num_traits::FromPrimitive,
+{
+    if array.null_count() == 0 {
+        return Ok(array.clone());
+    }
+
+    let mut sum = <T::Native as num_traits::Zero>::zero();
+    let mut count = 0_usize;
+    for value in array.iter().flatten() {
+        sum = sum + value;
+        count += 1;
+    }
+
+    if count == 0 {
+        return Err(NdarrowError::InvalidMetadata {
+            message: "cannot compute mean of an all-null array".to_owned(),
+        });
+    }
+
+    let denominator =
+        <T::Native as num_traits::FromPrimitive>::from_usize(count).ok_or_else(|| {
+            NdarrowError::TypeMismatch {
+                message: format!("cannot represent count {count} in element type"),
+            }
+        })?;
+    let mean = sum / denominator;
+
+    let values = array.iter().map(|value| value.unwrap_or(mean)).collect::<Vec<_>>();
+    Ok(PrimitiveArray::new(ScalarBuffer::from(values), None))
+}
+
+/// Compacts a primitive array by removing null positions.
+///
+/// # Allocation
+///
+/// Allocates a new values buffer only when nulls are present.
+///
+/// # Does not allocate
+///
+/// Returns a cheap clone when the array has no nulls.
+#[must_use]
+pub fn compact_non_null<T>(array: &PrimitiveArray<T>) -> PrimitiveArray<T>
+where
+    T: ArrowPrimitiveType,
+    T::Native: NdarrowElement,
+{
+    if array.null_count() == 0 {
+        return array.clone();
+    }
+
+    let values = array.iter().flatten().collect::<Vec<_>>();
+    PrimitiveArray::new(ScalarBuffer::from(values), None)
+}
+
 /// Reinterprets a primitive Arrow array as a 2D ndarray view.
 ///
 /// # Does not allocate
@@ -294,6 +390,74 @@ mod tests {
     }
 
     #[test]
+    fn fill_nulls_with_zero_replaces_nulls() {
+        let input = Float64Array::from(vec![Some(1.0_f64), None, Some(-2.5)]);
+        let output = fill_nulls_with_zero(&input);
+        let expected = [1.0_f64, 0.0, -2.5];
+
+        assert_eq!(output.null_count(), 0);
+        for (actual, expected) in output.values().iter().copied().zip(expected.iter().copied()) {
+            assert_abs_diff_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn fill_nulls_with_zero_no_nulls_is_passthrough() {
+        let input = Float32Array::from(vec![1.0_f32, 2.0, 3.0]);
+        let output = fill_nulls_with_zero(&input);
+        assert_eq!(output.null_count(), 0);
+        assert_eq!(output.values().as_ptr(), input.values().as_ptr());
+    }
+
+    #[test]
+    fn fill_nulls_with_mean_replaces_nulls() {
+        let input = Float32Array::from(vec![Some(2.0_f32), None, Some(4.0), None]);
+        let output = fill_nulls_with_mean(&input).expect("mean fill should succeed");
+        let expected = [2.0_f32, 3.0, 4.0, 3.0];
+
+        assert_eq!(output.null_count(), 0);
+        for (actual, expected) in output.values().iter().copied().zip(expected.iter().copied()) {
+            assert_abs_diff_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn fill_nulls_with_mean_no_nulls_is_passthrough() {
+        let input = Float64Array::from(vec![1.0_f64, 2.0, 3.0]);
+        let output = fill_nulls_with_mean(&input).expect("mean fill should succeed");
+        assert_eq!(output.null_count(), 0);
+        assert_eq!(output.values().as_ptr(), input.values().as_ptr());
+    }
+
+    #[test]
+    fn fill_nulls_with_mean_rejects_all_nulls() {
+        let input = Float64Array::from(vec![None, None, None]);
+        let err = fill_nulls_with_mean(&input).expect_err("all-null mean fill must fail");
+        assert!(matches!(err, NdarrowError::InvalidMetadata { .. }));
+    }
+
+    #[test]
+    fn compact_non_null_removes_null_positions() {
+        let input = Float64Array::from(vec![Some(1.0_f64), None, Some(5.0), None, Some(2.5)]);
+        let output = compact_non_null(&input);
+        let expected = [1.0_f64, 5.0, 2.5];
+
+        assert_eq!(output.null_count(), 0);
+        assert_eq!(output.len(), expected.len());
+        for (actual, expected) in output.values().iter().copied().zip(expected.iter().copied()) {
+            assert_abs_diff_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn compact_non_null_no_nulls_is_passthrough() {
+        let input = Float64Array::from(vec![1.0_f64, 5.0, 2.5]);
+        let output = compact_non_null(&input);
+        assert_eq!(output.null_count(), 0);
+        assert_eq!(output.values().as_ptr(), input.values().as_ptr());
+    }
+
+    #[test]
     fn reshape_primitive_to_array2_success() {
         let input = Float64Array::from(vec![1.0, 2.0, 3.0, 4.0]);
         let view = reshape_primitive_to_array2(&input, 2, 2).unwrap();
@@ -407,5 +571,101 @@ mod tests {
         };
         let err = densify_csr_view(&view).unwrap_err();
         assert!(matches!(err, NdarrowError::ShapeMismatch { .. }));
+    }
+
+    #[test]
+    fn densify_csr_view_rejects_mismatched_nnz_lengths() {
+        let row_ptrs = vec![0_i32, 1];
+        let col_indices = vec![0_u32];
+        let values = Vec::<f32>::new();
+        let view = CsrView {
+            nrows:       1,
+            ncols:       1,
+            row_ptrs:    &row_ptrs,
+            col_indices: &col_indices,
+            values:      &values,
+        };
+        let err = densify_csr_view(&view).unwrap_err();
+        assert!(matches!(err, NdarrowError::ShapeMismatch { .. }));
+    }
+
+    #[test]
+    fn densify_csr_view_rejects_non_zero_start_offset() {
+        let row_ptrs = vec![1_i32, 1];
+        let col_indices = Vec::<u32>::new();
+        let values = Vec::<f32>::new();
+        let view = CsrView {
+            nrows:       1,
+            ncols:       2,
+            row_ptrs:    &row_ptrs,
+            col_indices: &col_indices,
+            values:      &values,
+        };
+        let err = densify_csr_view(&view).unwrap_err();
+        assert!(matches!(err, NdarrowError::InvalidMetadata { .. }));
+    }
+
+    #[test]
+    fn densify_csr_view_rejects_negative_last_offset() {
+        let row_ptrs = vec![0_i32, -1];
+        let col_indices = Vec::<u32>::new();
+        let values = Vec::<f32>::new();
+        let view = CsrView {
+            nrows:       1,
+            ncols:       1,
+            row_ptrs:    &row_ptrs,
+            col_indices: &col_indices,
+            values:      &values,
+        };
+        let err = densify_csr_view(&view).unwrap_err();
+        assert!(matches!(err, NdarrowError::InvalidMetadata { .. }));
+    }
+
+    #[test]
+    fn densify_csr_view_rejects_last_offset_nnz_mismatch() {
+        let row_ptrs = vec![0_i32, 2];
+        let col_indices = vec![0_u32];
+        let values = vec![1.0_f32];
+        let view = CsrView {
+            nrows:       1,
+            ncols:       3,
+            row_ptrs:    &row_ptrs,
+            col_indices: &col_indices,
+            values:      &values,
+        };
+        let err = densify_csr_view(&view).unwrap_err();
+        assert!(matches!(err, NdarrowError::ShapeMismatch { .. }));
+    }
+
+    #[test]
+    fn densify_csr_view_rejects_decreasing_offsets() {
+        let row_ptrs = vec![0_i32, 1, 0, 2];
+        let col_indices = vec![0_u32, 1];
+        let values = vec![1.0_f32, 2.0];
+        let view = CsrView {
+            nrows:       3,
+            ncols:       3,
+            row_ptrs:    &row_ptrs,
+            col_indices: &col_indices,
+            values:      &values,
+        };
+        let err = densify_csr_view(&view).unwrap_err();
+        assert!(matches!(err, NdarrowError::InvalidMetadata { .. }));
+    }
+
+    #[test]
+    fn densify_csr_view_rejects_negative_row_offsets_during_iteration() {
+        let row_ptrs = vec![0_i32, -1, 1];
+        let col_indices = vec![0_u32];
+        let values = vec![1.0_f32];
+        let view = CsrView {
+            nrows:       2,
+            ncols:       1,
+            row_ptrs:    &row_ptrs,
+            col_indices: &col_indices,
+            values:      &values,
+        };
+        let err = densify_csr_view(&view).unwrap_err();
+        assert!(matches!(err, NdarrowError::InvalidMetadata { .. }));
     }
 }

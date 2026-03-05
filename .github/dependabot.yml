@@ -16,3 +16,9 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 1
+    rebase-strategy: "disabled"

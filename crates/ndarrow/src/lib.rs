@@ -52,18 +52,28 @@
 //! Bridge conversions are O(1) regardless of array size. The bridge creates views
 //! (pointer + shape) or transfers buffer ownership. It never touches the data.
 
+pub mod complex;
 pub mod element;
 pub mod error;
+pub mod extensions;
 pub mod helpers;
 pub mod inbound;
 pub mod outbound;
+pub mod prelude;
 pub mod sparse;
 pub mod tensor;
 
 // ─── Re-exports ───
 
+pub use complex::{
+    Complex32Extension, Complex64Extension, array1_complex32_to_extension,
+    array1_complex64_to_extension, complex32_as_array_view1, complex64_as_array_view1,
+};
 pub use element::NdarrowElement;
 pub use error::NdarrowError;
+pub use extensions::{
+    RegisteredExtension, deserialize_registered_extension, registered_extension_names,
+};
 pub use inbound::AsNdarray;
 // Re-export free functions for FixedSizeList conversions.
 pub use inbound::{

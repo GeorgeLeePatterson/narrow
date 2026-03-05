@@ -45,10 +45,14 @@ These are documented at the function level and at the type level.
 | FixedShapeTensor -> ArrayViewD   | Borrow flat buffer, parse shape meta   | O(1)       |
 | VarShapeTensor -> per-row view   | Borrow data slice at offset            | O(1)/row   |
 | CSR ext type -> CsrView         | Borrow offsets + indices + values      | O(1)       |
+| complex32 ext -> ArrayView1     | Borrow pair buffer, reinterpret as Complex32 | O(1) |
+| complex64 ext -> ArrayView1     | Borrow pair buffer, reinterpret as Complex64 | O(1) |
 | Two-column sparse -> CsrView    | Borrow from both columns               | O(1)       |
 | Array1 -> PrimitiveArray         | into_raw_vec -> ScalarBuffer::from     | O(1)       |
 | Array2 (std layout) -> FSL      | into_raw_vec -> ScalarBuffer::from     | O(1)       |
 | ArrayD (std layout) -> Tensor   | into_raw_vec + metadata construction   | O(1)       |
+| Array1<Complex32> -> complex32 ext | into_raw_vec -> pair reinterpret + ScalarBuffer | O(1) |
+| Array1<Complex64> -> complex64 ext | into_raw_vec -> pair reinterpret + ScalarBuffer | O(1) |
 | reshape(PrimitiveArray, shape)   | Pointer + shape, no copy               | O(1)       |
 | null_count check                 | Read pre-computed count                 | O(1)       |
 
@@ -59,7 +63,8 @@ These are documented at the function level and at the type level.
 | cast f32 -> f64                  | Allocate new buffer, widen each element| O(N)       |
 | cast f64 -> f32                  | Allocate new buffer, ndarrow each elem  | O(N)       |
 | densify(sparse, D)               | Allocate (M * D) buffer, fill          | O(M * D)   |
-| fill_nulls(array, value)         | Allocate new buffer, copy + fill       | O(N)       |
+| fill_nulls_with_zero             | Allocate new buffer, copy + fill       | O(N)       |
+| fill_nulls_with_mean             | Allocate new buffer, copy + fill       | O(N)       |
 | compact_non_null(array)          | Allocate smaller buffer, copy valid    | O(N)       |
 | Array2 (non-std) -> FSL         | as_standard_layout allocates copy      | O(M * N)   |
 | VarShapeTensor outbound          | Pack ragged arrays into struct         | O(total)   |

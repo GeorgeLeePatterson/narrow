@@ -4,19 +4,19 @@ Last updated: 2026-03-05
 
 ## Summary
 
-ndarrow is in the **core bridge complete** state.
-Core traits, error model, dense/sparse/tensor conversions, explicit null handling tiers, helper APIs,
-CI, and release automation are implemented.
+ndarrow is in the **implementation-complete** state for the current scoped milestone.
+Core traits, error model, dense/sparse/tensor/complex conversions, explicit null handling tiers,
+helper APIs, extension registry, prelude exports, CI, and release automation are implemented.
 The current implementation milestone is complete, including post-core helper/property/benchmark
-hardening items.
+hardening and complex-extension finalization.
 
 ## Crate State
 
 | Aspect                | Status |
 |-----------------------|--------|
 | Cargo.toml            | Workspace and crate dependencies configured (`arrow*`, `ndarray`, test/tooling deps). |
-| src/lib.rs            | Public API module wiring and re-exports implemented. |
-| Module tree           | `element`, `error`, `inbound`, `outbound`, `sparse`, `tensor`, `helpers` implemented. |
+| src/lib.rs            | Public API module wiring and re-exports implemented (`complex`, `extensions`, `prelude` included). |
+| Module tree           | `element`, `error`, `inbound`, `outbound`, `sparse`, `tensor`, `complex`, `extensions`, `helpers`, `prelude` implemented. |
 | Dependencies          | Added and pinned at workspace level. |
 | Tests                 | Unit + integration tests for dense, sparse, tensor, null semantics, and zero-copy behavior. |
 | CI                    | Implemented (`fmt`, `clippy`, feature checks, unit/integration tests, coverage, bench smoke). |
@@ -31,11 +31,14 @@ hardening items.
 5. `IntoArrow` for `Array1<T>` and `Array2<T>`.
 6. Sparse bridge APIs (`CsrMatrixExtension`, `CsrView`, inbound/outbound CSR paths).
 7. Tensor bridge APIs for `arrow.fixed_shape_tensor` and `arrow.variable_shape_tensor`.
-8. Explicit helpers (`cast_f32_to_f64`, `cast_f64_to_f32`, reshape helpers, layout normalization).
-9. Explicit sparse densification helper (`densify_csr_view`) with CSR invariant validation.
-10. Integration tests for round-trip correctness and zero-copy pointer guarantees (including sparse/tensor pointer identity checks).
-11. Property-test coverage for dense/sparse/tensor round-trip invariants.
-12. Benchmark harness with smoke-compatible public API conversion benchmarks plus baseline regression reporting/check gates.
+8. Explicit null helpers (`fill_nulls_with_zero`, `fill_nulls_with_mean`, `compact_non_null`).
+9. Explicit helpers (`cast_f32_to_f64`, `cast_f64_to_f32`, reshape helpers, layout normalization).
+10. Explicit sparse densification helper (`densify_csr_view`) with CSR invariant validation.
+11. Extension registry APIs (`registered_extension_names`, `deserialize_registered_extension`) and prelude re-exports.
+12. Complex extension bridge APIs (`ndarrow.complex32`, `ndarrow.complex64`) with zero-copy inbound/outbound paths.
+13. Integration tests for round-trip correctness and zero-copy pointer guarantees (including sparse/tensor pointer identity checks).
+14. Property-test coverage for dense/sparse/tensor round-trip invariants.
+15. Benchmark harness with smoke-compatible public API conversion benchmarks plus baseline regression reporting/check gates.
 
 ## Dependencies on Upstream Changes
 
@@ -46,7 +49,7 @@ See `NABLED_CHANGES.md` for detail.
 | First-class `f32` support | nabled | Completed and released in nabled `0.0.4` | No |
 | `CsrMatrixView` with Arrow-native index types | nabled | Completed and released in nabled `0.0.4` | No |
 | View-accepting sparse ops | nabled | Completed and released in nabled `0.0.4` | No |
-| Complex Arrow representation assessment | nabled | Out of nabled scope (tracked on ndarrow side) | No |
+| Complex Arrow representation assessment | nabled | Out of nabled scope (completed in ndarrow) | No |
 
 ## Constraints In Force
 
@@ -58,6 +61,4 @@ See `NABLED_CHANGES.md` for detail.
 
 ## Next Milestone
 
-Current remaining design work is tracked as:
-
-1. Complex-number Arrow representation decision and implementation.
+No in-scope implementation items remain for the current milestone.

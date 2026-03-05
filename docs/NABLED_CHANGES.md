@@ -53,12 +53,13 @@ ergonomics when both crates are used together, but does not block ndarrow implem
 
 ### NC-004: Complex Type Support Assessment
 
-**Status**: Out of scope for nabled (tracked on ndarrow side)  
+**Status**: Completed on ndarrow side; remains out of scope for nabled  
 **Priority**: Low  
 **Blocking ndarrow?**: No
 
 This item concerns Arrow representation decisions for complex values. nabled does support complex
-numerics, but Arrow-bridge representation choices belong to ndarrow architecture.
+numerics, but Arrow-bridge representation choices belong to ndarrow architecture. ndarrow now
+implements `ndarrow.complex32` and `ndarrow.complex64` extension bridges.
 
 ## Interim Artifacts in ndarrow
 
@@ -81,7 +82,7 @@ typing and is intentionally separate from nabled scalar traits.
 | Dense views | Implemented (`AsNdarray`, `FixedSizeList -> ArrayView2`) | Accepts ndarray views | Aligned |
 | Sparse views (`i32`/`u32`) | Implemented (`CsrView`, extension + column paths) | `CsrMatrixView` completed | Aligned |
 | Sparse view ops | Implemented bridge-side view extraction | `_view` sparse APIs completed | Aligned |
-| Complex Arrow bridge | Not yet defined | N/A (out of scope) | Open design item (ndarrow) |
+| Complex Arrow bridge | Implemented (`ndarrow.complex32`/`ndarrow.complex64`) | N/A (out of scope) | Closed (ndarrow-owned) |
 
 Overall: upstream nabled interop tasks are complete and released (`0.0.4`); ndarrow can proceed
 independently while interoperating with the published nabled baseline.

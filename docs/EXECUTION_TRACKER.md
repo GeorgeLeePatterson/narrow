@@ -44,6 +44,9 @@ Operational state tracker for ndarrow implementation progress.
 | I-023 | Benchmark baseline persistence/reporting refinements implemented (`bench_report.sh`, CI summary + threshold checks) | 9 |
 | I-024 | Sparse/tensor allocation verification expanded in integration tests (pointer-identity zero-copy checks) | 9 |
 | I-025 | `cast_f64_to_f32` finite-range failure semantics hardened with explicit overflow rejection tests | 8 |
+| I-026 | Null helper APIs completed (`fill_nulls_with_zero`, `fill_nulls_with_mean`, `compact_non_null`) | 8 |
+| I-027 | Extension registry and crate prelude completed (`extensions`, `prelude`) | 10 |
+| I-028 | Complex extension bridge completed (`ndarrow.complex32`/`ndarrow.complex64` inbound/outbound + tests) | 10 |
 
 ## Next (Priority Order)
 
@@ -51,6 +54,4 @@ No open in-scope implementation items remain for the current milestone.
 
 ## Needed (Open Questions)
 
-| ID    | Description | Notes |
-|-------|-------------|-------|
-| K-007 | Decide complex Arrow representation strategy for ndarrow | NC-004 equivalent, ndarrow-owned design |
+No open questions remain for the current milestone.

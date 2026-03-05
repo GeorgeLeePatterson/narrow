@@ -854,6 +854,7 @@ dependencies = [
  "arrow-schema",
  "criterion",
  "ndarray",
+ "num-complex",
  "num-traits",
  "proptest",
  "serde",
