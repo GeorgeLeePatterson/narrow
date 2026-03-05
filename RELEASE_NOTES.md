@@ -1,15 +1,17 @@
-## [0.0.1] - 2026-03-05
+## [0.0.2] - 2026-03-05
+
+### Bug Fixes
+
+- Impls and updates sparse, tensor, and helper APIs
+- Adds property tests, expands helpers, updates some tooling
+- Completes complex bridges, null helper behavior, and extension registry coverage
+- Bumps arrow support to 58
 
 ### Miscellaneous Tasks
 
-- Setting up repo
-- Adds license
-- Rename to ndarrow
-- Drops version to 0.0.1
-- Patches incorrect flag in bench step
-
-### Build
-
-- Fixes ci coverage
+- Patches error in justfile prepare-release version update
+- Updates docs, addresses ci
+- Updates ci and pr
+- Fixes dependabot
 
 
