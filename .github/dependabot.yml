@@ -6,7 +6,18 @@ updates:
       interval: "weekly"
       day: "monday"
     groups:
+      arrow-family:
+        patterns:
+          - "arrow"
+          - "arrow-*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
       patch-updates:
+        exclude-patterns:
+          - "arrow"
+          - "arrow-*"
         update-types:
           - "patch"
     open-pull-requests-limit: 5
