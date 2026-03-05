@@ -39,19 +39,18 @@ Operational state tracker for ndarrow implementation progress.
 | I-018 | Explicit helper APIs implemented (`cast`, `reshape`, `to_standard_layout`) | 8 |
 | I-019 | Coverage restored to passing threshold after sparse/tensor additions (>= 90%) | 10 |
 | I-020 | Capability/tracker/status/nabled docs synchronized to implemented state | 10 |
+| I-021 | `densify_csr_view` helper implemented with CSR invariant validation and helper tests | 8 |
+| I-022 | Property-based integration tests added for dense/sparse/tensor round-trip invariants | 9 |
+| I-023 | Benchmark baseline persistence/reporting refinements implemented (`bench_report.sh`, CI summary + threshold checks) | 9 |
+| I-024 | Sparse/tensor allocation verification expanded in integration tests (pointer-identity zero-copy checks) | 9 |
+| I-025 | `cast_f64_to_f32` finite-range failure semantics hardened with explicit overflow rejection tests | 8 |
 
 ## Next (Priority Order)
 
-| ID    | Description | Phase | Priority |
-|-------|-------------|-------|----------|
-| N-022 | `densify` helper | 8 | P2 |
-| N-024 | Property tests | 9 | P2 |
-| N-025 | Benchmark baseline persistence/reporting refinements | 9 | P2 |
-| N-026 | Allocation verification expansion for sparse/tensor paths | 9 | P2 |
+No open in-scope implementation items remain for the current milestone.
 
 ## Needed (Open Questions)
 
 | ID    | Description | Notes |
 |-------|-------------|-------|
 | K-007 | Decide complex Arrow representation strategy for ndarrow | NC-004 equivalent, ndarrow-owned design |
-| K-008 | Property-test strategy depth (`proptest` scenarios) | Sparse/tensor invariants and round-trip laws |

@@ -50,7 +50,7 @@
 |-------------------------------------|--------|----------------------------------------------|
 | cast f32 -> f64                     | Done   | `cast_f32_to_f64`                            |
 | cast f64 -> f32                     | Done   | `cast_f64_to_f32` (fallible)                 |
-| densify sparse -> dense             | --     | Sparse to FixedSizeList                      |
+| densify sparse -> dense             | Done   | `helpers::densify_csr_view`                  |
 | reshape PrimitiveArray -> 2D view   | Done   | `reshape_primitive_to_array2`                |
 | reshape PrimitiveArray -> ND view   | Done   | `reshape_primitive_to_arrayd`                |
 | to_standard_layout                  | Done   | No-op if already C-contiguous                |
@@ -95,5 +95,6 @@
 | CI pipeline                         | Done   | GitHub Actions                               |
 | Coverage >= 90%                     | Done   | Gate configured in just/CI                   |
 | Benchmarks                          | Done   | Public API conversion benchmark suites       |
-| Sparse/tensor unit tests            | Done   | Added and passing in `just checks`           |
-| Property tests                      | --     | Round-trip Arrow -> ndarray -> Arrow          |
+| Benchmark baseline/reporting gate   | Done   | Criterion baseline cache + regression summary/check |
+| Sparse/tensor allocation verification | Done | Pointer-identity tests for CSR/tensor view paths |
+| Property tests                      | Done   | Dense/sparse/tensor round-trip properties via `proptest` |

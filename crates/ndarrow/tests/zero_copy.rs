@@ -5,11 +5,15 @@
 //! buffers, and ownership transfers preserve the original allocation.
 
 use arrow_array::{
-    Float32Array, Float64Array, PrimitiveArray,
+    Float32Array, Float64Array, ListArray, PrimitiveArray,
     types::{Float32Type, Float64Type},
 };
-use ndarray::{Array1, Array2};
-use ndarrow::{AsNdarray, IntoArrow};
+use ndarray::{Array1, Array2, ArrayD, IxDyn};
+use ndarrow::{
+    AsNdarray, IntoArrow, arrayd_to_fixed_shape_tensor, arrays_to_variable_shape_tensor,
+    csr_to_extension_array, csr_view_from_extension, fixed_shape_tensor_as_array_viewd,
+    variable_shape_tensor_iter,
+};
 
 // ─── Inbound: views point to Arrow's buffer ───
 
@@ -148,4 +152,52 @@ fn pipeline_only_computation_allocates() {
 
     // The only allocation in the pipeline is step 2 (the computation).
     // Steps 1 and 3 are O(1) pointer operations.
+}
+
+// ─── Sparse/tensor zero-copy checks ───
+
+#[test]
+fn csr_extension_view_borrows_arrow_buffers() {
+    let row_ptrs = vec![0_i32, 2, 3];
+    let col_indices = vec![0_u32, 2, 1];
+    let values = vec![1.0_f64, 5.0, 2.0];
+    let (field, array) = csr_to_extension_array("csr", 4, row_ptrs, col_indices, values).unwrap();
+
+    let indices = array.column(0).as_any().downcast_ref::<ListArray>().unwrap();
+    let indices_values =
+        indices.values().as_any().downcast_ref::<arrow_array::UInt32Array>().unwrap();
+    let values_col = array.column(1).as_any().downcast_ref::<ListArray>().unwrap();
+    let values_values = values_col.values().as_any().downcast_ref::<Float64Array>().unwrap();
+
+    let view = csr_view_from_extension::<Float64Type>(&field, &array).unwrap();
+    assert_eq!(view.col_indices.as_ptr(), indices_values.values().as_ref().as_ptr());
+    assert_eq!(view.values.as_ptr(), values_values.values().as_ref().as_ptr());
+}
+
+#[test]
+fn fixed_shape_tensor_view_borrows_arrow_buffer() {
+    let data = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let tensor = ArrayD::from_shape_vec(IxDyn(&[2, 3]), data).unwrap();
+    let (field, fsl) = arrayd_to_fixed_shape_tensor("tensor", tensor).unwrap();
+
+    let inner = fsl.values().as_any().downcast_ref::<Float32Array>().unwrap();
+    let arrow_ptr = inner.values().as_ref().as_ptr();
+    let view = fixed_shape_tensor_as_array_viewd::<Float32Type>(&field, &fsl).unwrap();
+    assert_eq!(view.as_ptr(), arrow_ptr);
+}
+
+#[test]
+fn variable_shape_tensor_iter_borrows_arrow_buffer() {
+    let a = ArrayD::from_shape_vec(IxDyn(&[2, 2]), vec![1.0_f32, 2.0, 3.0, 4.0]).unwrap();
+    let b = ArrayD::from_shape_vec(IxDyn(&[1, 2]), vec![5.0_f32, 6.0]).unwrap();
+    let (field, array) = arrays_to_variable_shape_tensor("ragged", vec![a, b], None).unwrap();
+
+    let data_col =
+        array.column_by_name("data").unwrap().as_any().downcast_ref::<ListArray>().unwrap();
+    let data_values = data_col.values().as_any().downcast_ref::<Float32Array>().unwrap();
+    let arrow_ptr = data_values.values().as_ref().as_ptr();
+
+    let mut iter = variable_shape_tensor_iter::<Float32Type>(&field, &array).unwrap();
+    let (_row, view) = iter.next().unwrap().unwrap();
+    assert_eq!(view.as_ptr(), arrow_ptr);
 }

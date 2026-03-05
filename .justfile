@@ -121,14 +121,22 @@ bench-smoke:
     echo "Benchmark smoke tests complete."
 
 bench-report:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    echo "Running benchmarks with baseline comparison..."
-    cargo bench --workspace -- --save-baseline current
-    echo "Benchmarks complete. Results in target/criterion/"
+    bash ./scripts/bench_report.sh
+
+bench-report-check:
+    BENCH_FAIL_ON_REGRESSION=1 bash ./scripts/bench_report.sh
 
 bench-baseline-update:
-    cargo bench --workspace -- --save-baseline main
+    cargo bench -p ndarrow --bench inbound_benchmarks -- --save-baseline main
+    cargo bench -p ndarrow --bench outbound_benchmarks -- --save-baseline main
+
+bench-smoke-report:
+    just -f {{ justfile() }} bench-smoke
+    just -f {{ justfile() }} bench-report
+
+bench-smoke-check:
+    just -f {{ justfile() }} bench-smoke
+    just -f {{ justfile() }} bench-report-check
 
 # --- RELEASE ---
 

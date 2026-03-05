@@ -7,8 +7,8 @@ Last updated: 2026-03-05
 ndarrow is in the **core bridge complete** state.
 Core traits, error model, dense/sparse/tensor conversions, explicit null handling tiers, helper APIs,
 CI, and release automation are implemented.
-
-Remaining implementation work is now limited to selected helper/property-test hardening items.
+The current implementation milestone is complete, including post-core helper/property/benchmark
+hardening items.
 
 ## Crate State
 
@@ -20,7 +20,7 @@ Remaining implementation work is now limited to selected helper/property-test ha
 | Dependencies          | Added and pinned at workspace level. |
 | Tests                 | Unit + integration tests for dense, sparse, tensor, null semantics, and zero-copy behavior. |
 | CI                    | Implemented (`fmt`, `clippy`, feature checks, unit/integration tests, coverage, bench smoke). |
-| Coverage              | Gate configured at 90% line coverage and currently passing (`91.94%` on latest `just checks`). |
+| Coverage              | Gate configured at 90% line coverage and currently passing (`90.33%` on latest `just checks`). |
 
 ## Implemented Capability Baseline
 
@@ -32,8 +32,10 @@ Remaining implementation work is now limited to selected helper/property-test ha
 6. Sparse bridge APIs (`CsrMatrixExtension`, `CsrView`, inbound/outbound CSR paths).
 7. Tensor bridge APIs for `arrow.fixed_shape_tensor` and `arrow.variable_shape_tensor`.
 8. Explicit helpers (`cast_f32_to_f64`, `cast_f64_to_f32`, reshape helpers, layout normalization).
-9. Integration tests for round-trip correctness and zero-copy pointer guarantees.
-10. Benchmark harness with smoke-compatible public API conversion benchmarks.
+9. Explicit sparse densification helper (`densify_csr_view`) with CSR invariant validation.
+10. Integration tests for round-trip correctness and zero-copy pointer guarantees (including sparse/tensor pointer identity checks).
+11. Property-test coverage for dense/sparse/tensor round-trip invariants.
+12. Benchmark harness with smoke-compatible public API conversion benchmarks plus baseline regression reporting/check gates.
 
 ## Dependencies on Upstream Changes
 
@@ -56,8 +58,6 @@ See `NABLED_CHANGES.md` for detail.
 
 ## Next Milestone
 
-**Post-core backlog**:
+Current remaining design work is tracked as:
 
-1. Densify helper and related explicit alloc helpers.
-2. Property-test expansion across sparse/tensor invariants.
-3. Complex-number Arrow representation decision and implementation.
+1. Complex-number Arrow representation decision and implementation.
