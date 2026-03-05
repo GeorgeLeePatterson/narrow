@@ -9,39 +9,21 @@ defines the bridge contract. Concrete implementations wire Arrow types to ndarra
 
 ```
 ndarrow/
-  src/
-    lib.rs                      # Crate root, re-exports, prelude
-    error.rs                    # NdarrowError enum
-    element.rs                  # NdarrowElement trait (Arrow <-> ndarray type bridge)
-
-    ext/                        # Arrow extension type definitions
-      mod.rs
-      csr_matrix.rs             # ndarrow.csr_matrix extension type
-
-    inbound/                    # Arrow -> ndarray (zero-copy views)
-      mod.rs
-      primitive.rs              # PrimitiveArray<T> -> ArrayView1<T>
-      fixed_size_list.rs        # FixedSizeList<T>(D) -> ArrayView2<T>
-      tensor.rs                 # arrow.fixed_shape_tensor -> ArrayViewD<T>
-      variable_tensor.rs        # arrow.variable_shape_tensor -> per-row ArrayViewD<T>
-      sparse.rs                 # ndarrow.csr_matrix -> CsrView (or two-column convenience)
-
-    outbound/                   # ndarray -> Arrow (ownership transfer)
-      mod.rs
-      array1.rs                 # Array1<T> -> PrimitiveArray<T>
-      array2.rs                 # Array2<T> -> FixedSizeList<T>(N)
-      arrayd.rs                 # ArrayD<T> -> arrow.fixed_shape_tensor
-      sparse.rs                 # CsrMatrix-like -> ndarrow.csr_matrix
-
-    nulls.rs                    # Null handling utilities (validate, mask, fill)
-
-    helpers/                    # Explicit allocation points
-      mod.rs
-      cast.rs                   # Type widening/ndarrowing (e.g., f32 -> f64)
-      densify.rs                # Sparse -> dense conversion
-      reshape.rs                # PrimitiveArray -> 2D/3D/ND reinterpretation
-      layout.rs                 # Standard layout normalization
+  crates/
+    ndarrow/
+      src/
+        lib.rs                  # Crate root, re-exports
+        error.rs                # NdarrowError enum
+        element.rs              # NdarrowElement trait (Arrow <-> ndarray type bridge)
+        inbound.rs              # Dense Arrow -> ndarray view conversions + AsNdarray trait
+        outbound.rs             # Dense ndarray -> Arrow ownership-transfer conversions + IntoArrow
+        sparse.rs               # ndarrow.csr_matrix extension, CsrView, sparse inbound/outbound
+        tensor.rs               # fixed/variable tensor extension inbound/outbound APIs
+        helpers.rs              # Explicit allocation helpers (cast/reshape/layout)
 ```
+
+The implementation currently uses single-file modules per capability area. Submodule splits can be
+introduced later if code volume requires.
 
 ## Trait Hierarchy
 

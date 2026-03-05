@@ -33,32 +33,25 @@ Operational state tracker for ndarrow implementation progress.
 | I-012 | Public API benchmark suites added for inbound/outbound conversions | 9 |
 | I-013 | Benchmark smoke command aligned to quick smoke convention | 9 |
 | I-014 | nabled interop tracker updated with verified NC-001/NC-002/NC-003 completion | 10 |
+| I-015 | `ndarrow.csr_matrix` extension type + `CsrView` + sparse inbound/outbound APIs implemented | 5 |
+| I-016 | Fixed-shape tensor inbound/outbound APIs implemented | 6 |
+| I-017 | Variable-shape tensor inbound iterator + outbound packing implemented | 7 |
+| I-018 | Explicit helper APIs implemented (`cast`, `reshape`, `to_standard_layout`) | 8 |
+| I-019 | Coverage restored to passing threshold after sparse/tensor additions (>= 90%) | 10 |
+| I-020 | Capability/tracker/status/nabled docs synchronized to implemented state | 10 |
 
 ## Next (Priority Order)
 
 | ID    | Description | Phase | Priority |
 |-------|-------------|-------|----------|
-| N-013 | `ndarrow.csr_matrix` extension type definition | 5 | P1 |
-| N-014 | `CsrView` type definition | 5 | P1 |
-| N-015 | Sparse inbound (extension type + two-column) | 5 | P1 |
-| N-016 | Sparse outbound | 5 | P1 |
-| N-017 | FixedShapeTensor inbound | 6 | P1 |
-| N-018 | FixedShapeTensor outbound | 6 | P1 |
-| N-019 | VariableShapeTensor inbound iterator | 7 | P1 |
-| N-020 | VariableShapeTensor outbound | 7 | P1 |
-| N-021 | `cast` helper | 8 | P2 |
 | N-022 | `densify` helper | 8 | P2 |
-| N-023 | `reshape` helper | 8 | P2 |
 | N-024 | Property tests | 9 | P2 |
 | N-025 | Benchmark baseline persistence/reporting refinements | 9 | P2 |
 | N-026 | Allocation verification expansion for sparse/tensor paths | 9 | P2 |
-| N-027 | Documentation polish for newly added capabilities | 10 | P2 |
 
 ## Needed (Open Questions)
 
 | ID    | Description | Notes |
 |-------|-------------|-------|
-| K-004 | Verify FixedShapeTensor API details in current arrow-rs | Feature semantics and metadata shape contract |
-| K-005 | Verify VariableShapeTensor feature/stability in arrow-rs | Extension/type availability and ergonomics |
 | K-007 | Decide complex Arrow representation strategy for ndarrow | NC-004 equivalent, ndarrow-owned design |
 | K-008 | Property-test strategy depth (`proptest` scenarios) | Sparse/tensor invariants and round-trip laws |

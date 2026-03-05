@@ -17,7 +17,7 @@ ergonomics when both crates are used together, but does not block ndarrow implem
 
 ### NC-001: First-Class f32 Support
 
-**Status**: Completed in nabled `main` (release publication pending)  
+**Status**: Completed and released in nabled `0.0.4`  
 **Priority**: High  
 **Blocking ndarrow?**: No
 
@@ -29,7 +29,7 @@ ergonomics when both crates are used together, but does not block ndarrow implem
 
 ### NC-002: CsrMatrixView with Arrow-Native Index Types
 
-**Status**: Completed in nabled `main` (release publication pending)  
+**Status**: Completed and released in nabled `0.0.4`  
 **Priority**: High  
 **Blocking ndarrow?**: No
 
@@ -41,7 +41,7 @@ ergonomics when both crates are used together, but does not block ndarrow implem
 
 ### NC-003: View-Accepting Sparse Operations
 
-**Status**: Completed in nabled `main` (release publication pending)  
+**Status**: Completed and released in nabled `0.0.4`  
 **Priority**: Medium  
 **Blocking ndarrow?**: No
 
@@ -62,9 +62,9 @@ numerics, but Arrow-bridge representation choices belong to ndarrow architecture
 
 ## Interim Artifacts in ndarrow
 
-### IA-001: CsrView Type (planned)
+### IA-001: CsrView Type (implemented)
 
-ndarrow will keep its own Arrow-native CSR view abstraction. Even though nabled now has
+ndarrow keeps its own Arrow-native CSR view abstraction (`CsrView`). Even though nabled has
 `CsrMatrixView`, ndarrow remains nabled-independent by design.
 
 ### IA-002: NdarrowElement Trait (implemented)
@@ -76,12 +76,12 @@ typing and is intentionally separate from nabled scalar traits.
 
 | Aspect | ndarrow state | nabled state | Cohesion |
 |--------|---------------|--------------|----------|
-| `f32` support | Implemented (`NdarrowElement`, dense conversions/tests) | Completed in `main` | Aligned |
+| `f32` support | Implemented (`NdarrowElement`, dense conversions/tests) | Released in `0.0.4` | Aligned |
 | `f64` support | Implemented | Completed | Aligned |
 | Dense views | Implemented (`AsNdarray`, `FixedSizeList -> ArrayView2`) | Accepts ndarray views | Aligned |
-| Sparse views (`i32`/`u32`) | Planned in ndarrow sparse phase | `CsrMatrixView` completed | Aligned direction |
-| Sparse view ops | Planned in ndarrow sparse phase | `_view` sparse APIs completed | Aligned direction |
+| Sparse views (`i32`/`u32`) | Implemented (`CsrView`, extension + column paths) | `CsrMatrixView` completed | Aligned |
+| Sparse view ops | Implemented bridge-side view extraction | `_view` sparse APIs completed | Aligned |
 | Complex Arrow bridge | Not yet defined | N/A (out of scope) | Open design item (ndarrow) |
 
-Overall: upstream nabled interop tasks are complete in `main`; ndarrow can proceed independently
-and can consume the published nabled release once that release is cut.
+Overall: upstream nabled interop tasks are complete and released (`0.0.4`); ndarrow can proceed
+independently while interoperating with the published nabled baseline.

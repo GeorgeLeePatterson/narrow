@@ -54,8 +54,11 @@
 
 pub mod element;
 pub mod error;
+pub mod helpers;
 pub mod inbound;
 pub mod outbound;
+pub mod sparse;
+pub mod tensor;
 
 // ─── Re-exports ───
 
@@ -68,3 +71,11 @@ pub use inbound::{
     fixed_size_list_as_array2_unchecked,
 };
 pub use outbound::IntoArrow;
+pub use sparse::{
+    CsrMatrixExtension, CsrMatrixMetadata, CsrView, csr_to_extension_array, csr_view_from_columns,
+    csr_view_from_extension,
+};
+pub use tensor::{
+    VariableShapeTensorIter, arrayd_to_fixed_shape_tensor, arrays_to_variable_shape_tensor,
+    fixed_shape_tensor_as_array_viewd, variable_shape_tensor_iter,
+};

@@ -16,10 +16,10 @@
 | PrimitiveArray<f64> -> ArrayView1   | Done   | Implemented via `AsNdarray`                  |
 | FixedSizeList<f32> -> ArrayView2    | Done   | Implemented (`validated`/`unchecked`/`masked`) |
 | FixedSizeList<f64> -> ArrayView2    | Done   | Implemented (`validated`/`unchecked`/`masked`) |
-| FixedShapeTensor -> ArrayViewD      | --     | Shape from extension metadata                |
-| VariableShapeTensor -> per-row view | --     | Iterator over per-element ArrayViewD         |
-| ndarrow.csr_matrix -> CsrView       | --     | Borrow offsets + indices + values            |
-| Two-column sparse -> CsrView       | --     | Convenience API for separate columns         |
+| FixedShapeTensor -> ArrayViewD      | Done   | `fixed_shape_tensor_as_array_viewd`          |
+| VariableShapeTensor -> per-row view | Done   | `variable_shape_tensor_iter` iterator        |
+| ndarrow.csr_matrix -> CsrView       | Done   | `csr_view_from_extension`                    |
+| Two-column sparse -> CsrView        | Done   | `csr_view_from_columns` convenience path     |
 
 ## Outbound: ndarray -> Arrow (Ownership Transfer)
 
@@ -29,8 +29,9 @@
 | Array1<f64> -> PrimitiveArray       | Done   | Implemented via `IntoArrow`                  |
 | Array2<f32> -> FixedSizeList        | Done   | Implemented via `IntoArrow`                  |
 | Array2<f64> -> FixedSizeList        | Done   | Implemented via `IntoArrow`                  |
-| ArrayD<T> -> FixedShapeTensor       | --     | into_raw_vec + shape metadata                |
-| CsrMatrix-like -> ndarrow.csr_matrix | --     | Transfer row_ptrs, indices, values           |
+| ArrayD<T> -> FixedShapeTensor       | Done   | `arrayd_to_fixed_shape_tensor`               |
+| ArrayD<T> rows -> VariableShapeTensor | Done | `arrays_to_variable_shape_tensor`            |
+| CsrMatrix-like -> ndarrow.csr_matrix | Done  | `csr_to_extension_array`                     |
 
 ## Null Handling
 
@@ -47,20 +48,20 @@
 
 | Capability                          | Status | Notes                                        |
 |-------------------------------------|--------|----------------------------------------------|
-| cast f32 -> f64                     | --     | Element-wise widening                        |
-| cast f64 -> f32                     | --     | Element-wise ndarrowing                       |
+| cast f32 -> f64                     | Done   | `cast_f32_to_f64`                            |
+| cast f64 -> f32                     | Done   | `cast_f64_to_f32` (fallible)                 |
 | densify sparse -> dense             | --     | Sparse to FixedSizeList                      |
-| reshape PrimitiveArray -> 2D view   | --     | Zero-copy if dimensions align                |
-| reshape PrimitiveArray -> ND view   | --     | Zero-copy if dimensions align                |
-| to_standard_layout                  | --     | No-op if already C-contiguous                |
+| reshape PrimitiveArray -> 2D view   | Done   | `reshape_primitive_to_array2`                |
+| reshape PrimitiveArray -> ND view   | Done   | `reshape_primitive_to_arrayd`                |
+| to_standard_layout                  | Done   | No-op if already C-contiguous                |
 
 ## Extension Types
 
 | Capability                          | Status | Notes                                        |
 |-------------------------------------|--------|----------------------------------------------|
-| arrow.fixed_shape_tensor support    | --     | Read/write canonical tensor extension        |
-| arrow.variable_shape_tensor support | --     | Read/write canonical variable tensor         |
-| ndarrow.csr_matrix definition        | --     | Custom sparse extension type                 |
+| arrow.fixed_shape_tensor support    | Done   | Inbound + outbound implemented               |
+| arrow.variable_shape_tensor support | Done   | Inbound iterator + outbound implemented      |
+| ndarrow.csr_matrix definition       | Done   | `CsrMatrixExtension` implemented             |
 | Extension type registration         | --     | Register handlers for deserialization        |
 
 ## Element Type Support
@@ -94,4 +95,5 @@
 | CI pipeline                         | Done   | GitHub Actions                               |
 | Coverage >= 90%                     | Done   | Gate configured in just/CI                   |
 | Benchmarks                          | Done   | Public API conversion benchmark suites       |
+| Sparse/tensor unit tests            | Done   | Added and passing in `just checks`           |
 | Property tests                      | --     | Round-trip Arrow -> ndarray -> Arrow          |
