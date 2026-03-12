@@ -54,7 +54,7 @@ fn require_extension_name(field: &Field, expected_name: &'static str) -> Result<
     }
 }
 
-fn field_with_extension_metadata(
+pub(crate) fn field_with_extension_metadata(
     field: Field,
     extension_name: &'static str,
     metadata_json: String,
@@ -169,7 +169,7 @@ pub(crate) fn parse_variable_shape_extension(
     Ok(extension)
 }
 
-fn parse_fixed_shape_metadata(field: &Field) -> Result<Vec<usize>, NdarrowError> {
+pub(crate) fn parse_fixed_shape_metadata(field: &Field) -> Result<Vec<usize>, NdarrowError> {
     parse_fixed_shape_extension(field)?;
 
     let raw_metadata =
@@ -181,6 +181,172 @@ fn parse_fixed_shape_metadata(field: &Field) -> Result<Vec<usize>, NdarrowError>
             message: format!("arrow.fixed_shape_tensor metadata parse failed: {e}"),
         })?;
     Ok(metadata.shape)
+}
+
+pub(crate) struct VariableShapeTensorStorage<'a> {
+    pub data:            &'a ListArray,
+    pub data_item_field: &'a Field,
+    pub shape_values:    &'a Int32Array,
+    pub dimensions:      usize,
+    pub uniform_shape:   Option<Vec<Option<i32>>>,
+}
+
+impl<'a> VariableShapeTensorStorage<'a> {
+    #[must_use]
+    pub(crate) fn row_cursor(&self) -> VariableShapeTensorRowCursor<'a> {
+        VariableShapeTensorRowCursor {
+            index:         0,
+            len:           self.data.len(),
+            data:          self.data,
+            shape_values:  self.shape_values,
+            dimensions:    self.dimensions,
+            uniform_shape: self.uniform_shape.clone(),
+        }
+    }
+}
+
+pub(crate) struct VariableShapeTensorRow {
+    pub row:   usize,
+    pub start: usize,
+    pub end:   usize,
+    pub shape: Vec<usize>,
+}
+
+pub(crate) struct VariableShapeTensorRowCursor<'a> {
+    index:         usize,
+    len:           usize,
+    data:          &'a ListArray,
+    shape_values:  &'a Int32Array,
+    dimensions:    usize,
+    uniform_shape: Option<Vec<Option<i32>>>,
+}
+
+impl VariableShapeTensorRowCursor<'_> {
+    pub(crate) fn next_row(&mut self) -> Option<Result<VariableShapeTensorRow, NdarrowError>> {
+        if self.index >= self.len {
+            return None;
+        }
+
+        let row = self.index;
+        self.index += 1;
+
+        let offsets = self.data.value_offsets();
+        let start = usize::try_from(offsets[row]).expect("Arrow list offsets must be non-negative");
+        let end =
+            usize::try_from(offsets[row + 1]).expect("Arrow list offsets must be non-negative");
+
+        let shape_start = row * self.dimensions;
+        let shape_end = shape_start + self.dimensions;
+
+        let mut shape = Vec::with_capacity(self.dimensions);
+        for (dim_idx, raw) in
+            self.shape_values.values().as_ref()[shape_start..shape_end].iter().copied().enumerate()
+        {
+            let dim = usize::try_from(raw).map_err(|_| NdarrowError::ShapeMismatch {
+                message: format!("negative tensor dimension at row {row}, dim {dim_idx}: {raw}"),
+            });
+            let dim = match dim {
+                Ok(dim) => dim,
+                Err(err) => return Some(Err(err)),
+            };
+
+            if let Some(uniform_shape) = &self.uniform_shape {
+                if let Some(expected) = uniform_shape[dim_idx] {
+                    let expected = usize::try_from(expected).map_err(|_| NdarrowError::InvalidMetadata {
+                        message: format!(
+                            "uniform_shape contains negative dimension at index {dim_idx}: {expected}"
+                        ),
+                    });
+                    let expected = match expected {
+                        Ok(expected) => expected,
+                        Err(err) => return Some(Err(err)),
+                    };
+                    if dim != expected {
+                        return Some(Err(NdarrowError::ShapeMismatch {
+                            message: format!(
+                                "row {row} dimension {dim_idx} violates uniform_shape: expected {expected}, found {dim}"
+                            ),
+                        }));
+                    }
+                }
+            }
+
+            shape.push(dim);
+        }
+
+        let required_len = shape
+            .iter()
+            .try_fold(1_usize, |acc, dim| acc.checked_mul(*dim))
+            .ok_or_else(|| NdarrowError::ShapeMismatch {
+                message: format!("row {row} shape product overflows usize: {shape:?}"),
+            });
+        let required_len = match required_len {
+            Ok(required_len) => required_len,
+            Err(err) => return Some(Err(err)),
+        };
+
+        if required_len != (end - start) {
+            return Some(Err(NdarrowError::ShapeMismatch {
+                message: format!(
+                    "row {row} shape product ({required_len}) does not match data length ({})",
+                    end - start
+                ),
+            }));
+        }
+
+        Some(Ok(VariableShapeTensorRow { row, start, end, shape }))
+    }
+}
+
+pub(crate) fn variable_shape_tensor_storage<'a>(
+    field: &Field,
+    array: &'a StructArray,
+) -> Result<VariableShapeTensorStorage<'a>, NdarrowError> {
+    if array.null_count() > 0 {
+        return Err(NdarrowError::NullsPresent { null_count: array.null_count() });
+    }
+
+    let extension = parse_variable_shape_extension(field)?;
+    extension.supports_data_type(array.data_type()).map_err(NdarrowError::from)?;
+
+    let data = array
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .expect("extension storage guarantees 'data' is ListArray");
+    if data.null_count() > 0 {
+        return Err(NdarrowError::NullsPresent { null_count: data.null_count() });
+    }
+    let data_item_field = match data.data_type() {
+        DataType::List(item) => item.as_ref(),
+        _ => unreachable!("validated variable-shape tensor storage guarantees List data"),
+    };
+
+    let shape = array
+        .column(1)
+        .as_any()
+        .downcast_ref::<FixedSizeListArray>()
+        .expect("extension storage guarantees 'shape' is FixedSizeListArray");
+    if shape.null_count() > 0 {
+        return Err(NdarrowError::NullsPresent { null_count: shape.null_count() });
+    }
+
+    let shape_values = shape
+        .values()
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .expect("extension storage guarantees variable shape inner Int32");
+    if shape_values.null_count() > 0 {
+        return Err(NdarrowError::NullsPresent { null_count: shape_values.null_count() });
+    }
+
+    Ok(VariableShapeTensorStorage {
+        data,
+        data_item_field,
+        shape_values,
+        dimensions: extension.dimensions(),
+        uniform_shape: extension.uniform_shapes().map(<[Option<i32>]>::to_vec),
+    })
 }
 
 /// Converts `arrow.fixed_shape_tensor` storage into an `ArrayViewD`.
@@ -333,14 +499,9 @@ where
     T: ArrowPrimitiveType,
     T::Native: NdarrowElement,
 {
-    index:         usize,
-    len:           usize,
-    data:          &'a ListArray,
-    data_values:   &'a PrimitiveArray<T>,
-    shape_values:  &'a Int32Array,
-    dimensions:    usize,
-    uniform_shape: Option<Vec<Option<i32>>>,
-    marker:        PhantomData<T>,
+    rows:        VariableShapeTensorRowCursor<'a>,
+    data_values: &'a PrimitiveArray<T>,
+    marker:      PhantomData<T>,
 }
 
 impl<'a, T> Iterator for VariableShapeTensorIter<'a, T>
@@ -351,80 +512,15 @@ where
     type Item = Result<(usize, ArrayViewD<'a, T::Native>), NdarrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.len {
-            return None;
-        }
-
-        let row = self.index;
-        self.index += 1;
-
-        let offsets = self.data.value_offsets();
-        let start = usize::try_from(offsets[row]).expect("Arrow list offsets must be non-negative");
-        let end =
-            usize::try_from(offsets[row + 1]).expect("Arrow list offsets must be non-negative");
-
-        let shape_start = row * self.dimensions;
-        let shape_end = shape_start + self.dimensions;
-
-        let mut shape = Vec::with_capacity(self.dimensions);
-        for (dim_idx, raw) in
-            self.shape_values.values().as_ref()[shape_start..shape_end].iter().copied().enumerate()
-        {
-            let dim = usize::try_from(raw).map_err(|_| NdarrowError::ShapeMismatch {
-                message: format!("negative tensor dimension at row {row}, dim {dim_idx}: {raw}"),
-            });
-            let dim = match dim {
-                Ok(dim) => dim,
-                Err(err) => return Some(Err(err)),
-            };
-
-            if let Some(uniform_shape) = &self.uniform_shape {
-                if let Some(expected) = uniform_shape[dim_idx] {
-                    let expected = usize::try_from(expected).map_err(|_| NdarrowError::InvalidMetadata {
-                        message: format!(
-                            "uniform_shape contains negative dimension at index {dim_idx}: {expected}"
-                        ),
-                    });
-                    let expected = match expected {
-                        Ok(expected) => expected,
-                        Err(err) => return Some(Err(err)),
-                    };
-                    if dim != expected {
-                        return Some(Err(NdarrowError::ShapeMismatch {
-                            message: format!(
-                                "row {row} dimension {dim_idx} violates uniform_shape: expected {expected}, found {dim}"
-                            ),
-                        }));
-                    }
-                }
-            }
-
-            shape.push(dim);
-        }
-
-        let required_len = shape
-            .iter()
-            .try_fold(1_usize, |acc, dim| acc.checked_mul(*dim))
-            .ok_or_else(|| NdarrowError::ShapeMismatch {
-                message: format!("row {row} shape product overflows usize: {shape:?}"),
-            });
-        let required_len = match required_len {
-            Ok(required_len) => required_len,
-            Err(err) => return Some(Err(err)),
+        let row = match self.rows.next_row() {
+            Some(Ok(row)) => row,
+            Some(Err(err)) => return Some(Err(err)),
+            None => return None,
         };
 
-        if required_len != (end - start) {
-            return Some(Err(NdarrowError::ShapeMismatch {
-                message: format!(
-                    "row {row} shape product ({required_len}) does not match data length ({})",
-                    end - start
-                ),
-            }));
-        }
-
-        let slice = &self.data_values.values().as_ref()[start..end];
-        let view = ArrayViewD::from_shape(IxDyn(&shape), slice).map_err(NdarrowError::from);
-        Some(view.map(|view| (row, view)))
+        let slice = &self.data_values.values().as_ref()[row.start..row.end];
+        let view = ArrayViewD::from_shape(IxDyn(&row.shape), slice).map_err(NdarrowError::from);
+        Some(view.map(|view| (row.row, view)))
     }
 }
 
@@ -453,56 +549,21 @@ where
     T: ArrowPrimitiveType,
     T::Native: NdarrowElement,
 {
-    if array.null_count() > 0 {
-        return Err(NdarrowError::NullsPresent { null_count: array.null_count() });
-    }
-
-    let extension = parse_variable_shape_extension(field)?;
-    extension.supports_data_type(array.data_type()).map_err(NdarrowError::from)?;
-
-    let data = array
-        .column(0)
-        .as_any()
-        .downcast_ref::<ListArray>()
-        .expect("extension storage guarantees 'data' is ListArray");
-    if data.null_count() > 0 {
-        return Err(NdarrowError::NullsPresent { null_count: data.null_count() });
-    }
-
-    let shape = array
-        .column(1)
-        .as_any()
-        .downcast_ref::<FixedSizeListArray>()
-        .expect("extension storage guarantees 'shape' is FixedSizeListArray");
-    if shape.null_count() > 0 {
-        return Err(NdarrowError::NullsPresent { null_count: shape.null_count() });
-    }
-
-    let dimensions = extension.dimensions();
-
-    let data_values = data
+    let storage = variable_shape_tensor_storage(field, array)?;
+    let data_values = storage
+        .data
         .values()
         .as_any()
         .downcast_ref::<PrimitiveArray<T>>()
         .expect("extension storage guarantees variable data inner type");
-    let shape_values = shape
-        .values()
-        .as_any()
-        .downcast_ref::<Int32Array>()
-        .expect("extension storage guarantees variable shape inner Int32");
-    Ok(VariableShapeTensorIter {
-        index: 0,
-        len: data.len(),
-        data,
-        data_values,
-        shape_values,
-        dimensions,
-        uniform_shape: extension.uniform_shapes().map(<[Option<i32>]>::to_vec),
-        marker: PhantomData,
-    })
+    if data_values.null_count() > 0 {
+        return Err(NdarrowError::NullsPresent { null_count: data_values.null_count() });
+    }
+
+    Ok(VariableShapeTensorIter { rows: storage.row_cursor(), data_values, marker: PhantomData })
 }
 
-fn push_tensor_shape(
+pub(crate) fn push_tensor_shape(
     shape: &[usize],
     row: usize,
     uniform_shape: Option<&[Option<i32>]>,

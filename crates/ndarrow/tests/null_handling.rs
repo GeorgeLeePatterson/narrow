@@ -166,6 +166,26 @@ fn fsl_masked_returns_outer_bitmap() {
     assert!(outer_nulls.is_valid(2));
 }
 
+#[test]
+fn fsl_masked_rejects_inner_component_nulls() {
+    use std::sync::Arc;
+
+    use arrow_array::FixedSizeListArray;
+    use arrow_schema::Field;
+
+    let values = Float64Array::from(vec![Some(1.0), None, Some(3.0), Some(4.0)]);
+    let field = Arc::new(Field::new("item", arrow_schema::DataType::Float64, true));
+    let fsl = FixedSizeListArray::new(field, 2, Arc::new(values), None);
+
+    let err = ndarrow::fixed_size_list_as_array2_masked::<arrow_array::types::Float64Type>(&fsl)
+        .unwrap_err();
+
+    match err {
+        NdarrowError::NullsPresent { null_count } => assert_eq!(null_count, 1),
+        other => panic!("expected NullsPresent, got: {other}"),
+    }
+}
+
 // ─── Error display ───
 
 #[test]

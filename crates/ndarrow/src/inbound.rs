@@ -206,15 +206,19 @@ where
     ArrayView2::from_shape((m, n), slice).expect("shape must match FixedSizeList invariant")
 }
 
-/// Zero-copy conversion from a [`FixedSizeListArray`] to an [`ArrayView2`] with a validity bitmap.
+/// Zero-copy conversion from a [`FixedSizeListArray`] to an [`ArrayView2`] with an outer-row
+/// validity bitmap.
 ///
-/// Always succeeds. Returns the view alongside the optional outer null buffer.
+/// Returns the view alongside the optional outer null buffer.
+/// Inner primitive nulls are rejected because this API only exposes whole-row validity; it does
+/// not provide a component-level null mask.
 ///
 /// # Does not allocate
 ///
 /// # Errors
 ///
 /// Returns:
+/// - [`NdarrowError::NullsPresent`] if the inner values contain nulls.
 /// - [`NdarrowError::InnerTypeMismatch`] if the inner values are not `PrimitiveArray<T>`.
 /// - [`NdarrowError::InvalidMetadata`] if `value_length` is negative.
 /// - [`NdarrowError::Shape`] if the inner buffer length does not match `(rows, value_length)`.
@@ -234,6 +238,9 @@ where
             ),
         }
     })?;
+    if values.null_count() > 0 {
+        return Err(NdarrowError::NullsPresent { null_count: values.null_count() });
+    }
 
     let n = fixed_size_list_value_length(array)?;
     let m = array.len();
@@ -417,6 +424,15 @@ mod tests {
         let (view, mask) = fixed_size_list_as_array2_masked::<Float64Type>(&fsl).unwrap();
         assert_eq!(view.dim(), (2, 2));
         assert!(mask.is_some());
+    }
+
+    #[test]
+    fn fsl_masked_rejects_inner_nulls() {
+        let values = Float64Array::from(vec![Some(1.0), None, Some(3.0), Some(4.0)]);
+        let field = Arc::new(Field::new("item", arrow_schema::DataType::Float64, true));
+        let fsl = FixedSizeListArray::new(field, 2, Arc::new(values), None);
+        let result = fixed_size_list_as_array2_masked::<Float64Type>(&fsl);
+        assert!(matches!(result, Err(NdarrowError::NullsPresent { null_count: 1 })));
     }
 
     // ─── Zero-copy verification ───

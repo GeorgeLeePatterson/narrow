@@ -45,14 +45,25 @@ These are documented at the function level and at the type level.
 | FixedShapeTensor -> ArrayViewD   | Borrow flat buffer, parse shape meta   | O(1)       |
 | VarShapeTensor -> per-row view   | Borrow data slice at offset            | O(1)/row   |
 | CSR ext type -> CsrView         | Borrow offsets + indices + values      | O(1)       |
+| CSR batch ext -> per-row CsrView | Borrow nested offsets + indices + values | O(1)/row |
 | complex32 ext -> ArrayView1     | Borrow pair buffer, reinterpret as Complex32 | O(1) |
 | complex64 ext -> ArrayView1     | Borrow pair buffer, reinterpret as Complex64 | O(1) |
+| FixedSizeList<complex32> -> ArrayView2 | Borrow nested pair buffer + reshape | O(1) |
+| FixedSizeList<complex64> -> ArrayView2 | Borrow nested pair buffer + reshape | O(1) |
+| FixedShapeTensor<complex32> -> ArrayViewD | Borrow nested pair buffer + shape | O(1) |
+| FixedShapeTensor<complex64> -> ArrayViewD | Borrow nested pair buffer + shape | O(1) |
+| VarShapeTensor<complex32> -> per-row ArrayViewD | Borrow nested pair buffer + shape | O(1)/row |
+| VarShapeTensor<complex64> -> per-row ArrayViewD | Borrow nested pair buffer + shape | O(1)/row |
 | Two-column sparse -> CsrView    | Borrow from both columns               | O(1)       |
 | Array1 -> PrimitiveArray         | into_raw_vec -> ScalarBuffer::from     | O(1)       |
 | Array2 (std layout) -> FSL      | into_raw_vec -> ScalarBuffer::from     | O(1)       |
 | ArrayD (std layout) -> Tensor   | into_raw_vec + metadata construction   | O(1)       |
 | Array1<Complex32> -> complex32 ext | into_raw_vec -> pair reinterpret + ScalarBuffer | O(1) |
 | Array1<Complex64> -> complex64 ext | into_raw_vec -> pair reinterpret + ScalarBuffer | O(1) |
+| Array2<Complex32> -> FixedSizeList<complex32> | flatten rows + reuse scalar carrier | O(1) |
+| Array2<Complex64> -> FixedSizeList<complex64> | flatten rows + reuse scalar carrier | O(1) |
+| ArrayD<Complex32> -> FixedShapeTensor<complex32> | reshape + reuse scalar carrier | O(1) |
+| ArrayD<Complex64> -> FixedShapeTensor<complex64> | reshape + reuse scalar carrier | O(1) |
 | reshape(PrimitiveArray, shape)   | Pointer + shape, no copy               | O(1)       |
 | null_count check                 | Read pre-computed count                 | O(1)       |
 
@@ -68,6 +79,8 @@ These are documented at the function level and at the type level.
 | compact_non_null(array)          | Allocate smaller buffer, copy valid    | O(N)       |
 | Array2 (non-std) -> FSL         | as_standard_layout allocates copy      | O(M * N)   |
 | VarShapeTensor outbound          | Pack ragged arrays into struct         | O(total)   |
+| Batched CSR matrix outbound      | Pack nested CSR rows into struct       | O(total)   |
+| VarShapeTensor<complex*> outbound | Pack ragged arrays + complex scalar carrier | O(total) |
 
 ### Computation Allocations (Expected, Not ndarrow's)
 

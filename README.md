@@ -55,10 +55,18 @@ let arrow_result = result.into_arrow()?;  // PrimitiveArray<Float64>, no allocat
 | `FixedSizeList<T>(D)` | `ArrayView2<T>` (M, D) | Arrow -> ndarray | Zero-copy |
 | `arrow.fixed_shape_tensor` | `ArrayViewD<T>` | Arrow -> ndarray | Zero-copy |
 | `arrow.variable_shape_tensor` | Per-row `ArrayViewD<T>` | Arrow -> ndarray | Zero-copy |
+| `FixedSizeList<ndarrow.complex32>(D)` | `ArrayView2<Complex32>` | Arrow -> ndarray | Zero-copy |
+| `FixedSizeList<ndarrow.complex64>(D)` | `ArrayView2<Complex64>` | Arrow -> ndarray | Zero-copy |
+| `arrow.fixed_shape_tensor<ndarrow.complex32>` | `ArrayViewD<Complex32>` | Arrow -> ndarray | Zero-copy |
+| `arrow.fixed_shape_tensor<ndarrow.complex64>` | `ArrayViewD<Complex64>` | Arrow -> ndarray | Zero-copy |
 | `ndarrow.csr_matrix` | `CsrView<T>` | Arrow -> ndarray | Zero-copy |
 | `Array1<T>` | `PrimitiveArray<T>` | ndarray -> Arrow | Zero-copy |
 | `Array2<T>` (M, N) | `FixedSizeList<T>(N)` | ndarray -> Arrow | Zero-copy* |
 | `ArrayD<T>` | `arrow.fixed_shape_tensor` | ndarray -> Arrow | Zero-copy* |
+| `Array2<Complex32>` | `FixedSizeList<ndarrow.complex32>(N)` | ndarray -> Arrow | Zero-copy* |
+| `Array2<Complex64>` | `FixedSizeList<ndarrow.complex64>(N)` | ndarray -> Arrow | Zero-copy* |
+| `ArrayD<Complex32>` | `arrow.fixed_shape_tensor<ndarrow.complex32>` | ndarray -> Arrow | Zero-copy* |
+| `ArrayD<Complex64>` | `arrow.fixed_shape_tensor<ndarrow.complex64>` | ndarray -> Arrow | Zero-copy* |
 
 \* Zero-copy if standard (C-contiguous) layout. Allocates a layout copy otherwise.
 
@@ -82,6 +90,10 @@ let view = unsafe { array.as_ndarray_unchecked() };
 let (view, mask) = array.as_ndarray_masked();
 ```
 
+For numerical object payloads such as `FixedSizeList<T>(D) -> ArrayView2<T>`, the masked path is
+row-oriented: it may return an outer row-validity bitmap, but actual inner component nulls are
+still rejected on validated and masked ingress.
+
 ## Extension Types
 
 ndarrow uses canonical Arrow extension types where they exist:
@@ -92,6 +104,8 @@ ndarrow uses canonical Arrow extension types where they exist:
 And defines its own for gaps:
 
 - `ndarrow.csr_matrix` — CSR sparse matrix representation
+- `ndarrow.complex32` — complex32 scalar element representation
+- `ndarrow.complex64` — complex64 scalar element representation
 
 ## Performance Guarantee
 

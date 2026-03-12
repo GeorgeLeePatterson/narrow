@@ -8,6 +8,11 @@ leverage ndarray-native numerical computation without allocation overhead on the
 Design principles: algebraic, compositional, homomorphic, denotationally sound.
 Vendor stance: agnostic. ndarrow knows Arrow and ndarray. Nothing else.
 
+Current downstream-driven release checkpoint:
+
+1. checkpoint 1 = `ndarrow` is ready for a new release under the full concept-first
+   standalone / `rows-of-X` bridge contract
+
 ## Document Index (Reading Order)
 
 | #  | Document                   | Purpose                                        |

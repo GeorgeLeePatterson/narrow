@@ -82,7 +82,7 @@ typing and is intentionally separate from nabled scalar traits.
 | Dense views | Implemented (`AsNdarray`, `FixedSizeList -> ArrayView2`) | Accepts ndarray views | Aligned |
 | Sparse views (`i32`/`u32`) | Implemented (`CsrView`, extension + column paths) | `CsrMatrixView` completed | Aligned |
 | Sparse view ops | Implemented bridge-side view extraction | `_view` sparse APIs completed | Aligned |
-| Complex Arrow bridge | Implemented (`ndarrow.complex32`/`ndarrow.complex64`) | N/A (out of scope) | Closed (ndarrow-owned) |
+| Complex Arrow bridge | Implemented for scalar, matrix, and fixed-shape tensor carriers | N/A (out of scope) | Closed (ndarrow-owned) |
 
 Overall: upstream nabled interop tasks are complete and released (`0.0.4`); ndarrow can proceed
 independently while interoperating with the published nabled baseline.

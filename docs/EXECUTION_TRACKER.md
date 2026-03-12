@@ -1,6 +1,6 @@
 # Execution Tracker
 
-Last updated: 2026-03-05
+Last updated: 2026-03-12
 
 ## Purpose
 
@@ -47,11 +47,21 @@ Operational state tracker for ndarrow implementation progress.
 | I-026 | Null helper APIs completed (`fill_nulls_with_zero`, `fill_nulls_with_mean`, `compact_non_null`) | 8 |
 | I-027 | Extension registry and crate prelude completed (`extensions`, `prelude`) | 10 |
 | I-028 | Complex extension bridge completed (`ndarrow.complex32`/`ndarrow.complex64` inbound/outbound + tests) | 10 |
+| I-029 | `FixedSizeList -> ArrayView2` masked ingress now explicitly exposes outer-row validity only and rejects inner component nulls; docs/tests synchronized | 4 |
+| I-030 | First-class complex matrix and fixed-shape tensor bridge APIs implemented by composing the scalar complex carrier inside canonical dense/tensor storage | 10 |
+| I-031 | Concept-family standalone / `rows-of-X` bridge matrix reviewed and narrowed-carrier slice documented; final matrix review identified two remaining carrier gaps before release | 10 |
+| I-032 | `ndarrow.csr_matrix_batch` implemented with per-row `CsrView` ingress, outbound construction, registry wiring, and tests | 5 |
+| I-033 | Complex `arrow.variable_shape_tensor` inbound/outbound carriers implemented by composing `ndarrow.complex32` / `ndarrow.complex64` inside canonical ragged tensor storage | 7 |
+| I-034 | Checkpoint 1 fully closed: the concept-family standalone / `rows-of-X` bridge matrix is implemented and release-ready | 10 |
 
 ## Next (Priority Order)
 
-No open in-scope implementation items remain for the current milestone.
+| ID    | Description | Phase |
+|-------|-------------|-------|
+| N-008 | Prepare release notes / version cut for the next `ndarrow` publication | 10 |
 
 ## Needed (Open Questions)
 
-No open questions remain for the current milestone.
+| ID    | Description |
+|-------|-------------|
+| Q-001 | No open architectural questions at checkpoint 1 scope. Resume at release prep or downstream `nabled` adoption work unless new carrier gaps are discovered. |

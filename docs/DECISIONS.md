@@ -97,11 +97,12 @@ single contiguous ndarray (the data is ragged).
 **Rationale**: Canonical Arrow extension type. Handles the ragged case (e.g., multi-vectors)
 without inventing a custom type. Cross-language interop with pyarrow.
 
-### D-014: Sparse Vectors — ndarrow.csr_matrix Extension Type
+### D-014: Sparse Matrix Objects and Sparse Vector Columns Use ndarrow.csr_matrix
 
-A column of sparse vectors uses a ndarrow-defined extension type `ndarrow.csr_matrix`. Storage is
-`StructArray{indices: List<UInt32>, values: List<T>}`. Metadata carries `ncols` (the dimension
-of the sparse vector space).
+A standalone sparse matrix object, or equivalently a column of sparse vectors, uses the
+ndarrow-defined extension type `ndarrow.csr_matrix`. Storage is
+`StructArray{indices: List<UInt32>, values: List<T>}`. Metadata carries `ncols` (the matrix
+column count / sparse vector dimension).
 
 The List offsets buffer serves as CSR `row_ptrs`. The indices values buffer serves as CSR
 `col_indices`. The values values buffer serves as CSR `values`. Both List columns must have
@@ -140,6 +141,40 @@ reject actual inner null values.
 **Rationale**: Arrow has no canonical complex scalar extension type. A two-lane fixed-size list
 preserves contiguous layout, supports zero-copy reinterpretation, and remains explicit/self-describing.
 
+### D-017: Higher-Rank Complex Shapes Reuse the Scalar Complex Element Carrier
+
+Higher-rank complex shapes do not introduce new extension families. Instead:
+
+1. complex dense matrices use nested `FixedSizeList<ndarrow.complex*>(D)` storage
+2. complex fixed-shape tensors use canonical `arrow.fixed_shape_tensor` with
+   `ndarrow.complex*` as the element storage type
+3. complex variable-shape tensors use canonical `arrow.variable_shape_tensor` with
+   `ndarrow.complex*` as the element storage type
+4. standalone and `rows-of-X` carriers therefore share the same scalar-complex element contract
+
+This keeps the complex representation compositional: one complex scalar encoding, reused uniformly
+inside matrix and tensor carriers.
+
+**Rationale**: Reusing the scalar complex extension avoids representational drift, removes the need
+for downstream custom codecs, preserves zero-copy reinterpretation, and keeps ndarrow vendor-agnostic.
+
+### D-018: Rows of Sparse Matrices Require an Explicit Batched CSR Carrier
+
+A column where each row is a sparse matrix uses a ndarrow-defined extension type
+`ndarrow.csr_matrix_batch`. Storage is
+`StructArray{shape: FixedSizeList<Int32>(2), row_ptrs: List<Int32>, col_indices: List<UInt32>, values: List<T>}`.
+Each top-level row is one sparse matrix object. `shape[row] = [nrows, ncols]`,
+`row_ptrs[row].len() = nrows + 1`, and the last row pointer must equal the per-row `nnz`, which
+must also equal the lengths of `col_indices[row]` and `values[row]`.
+
+Per-row access yields `CsrView` or equivalent sparse matrix views. Batch access is iterator-based;
+there is no single contiguous sparse ndarray view spanning the entire batch.
+
+**Rationale**: `ndarrow.csr_matrix` already uses its top-level row axis as the CSR row axis of one
+matrix object. That representation cannot also delimit a second outer object axis for “rows of
+sparse matrices”. An explicit batched carrier preserves object boundaries, supports varying sparse
+matrix shapes per row, and avoids accidental densification or ambiguous nested-List semantics.
+
 ## Null Handling
 
 ### D-020: Three Null Tiers
@@ -165,6 +200,23 @@ allocation cost is visible at the call site.
 
 **Rationale**: Null handling strategies (fill with zero, fill with mean, drop rows) are
 domain-specific. ndarrow provides the tools but does not choose a strategy.
+
+### D-022: Numerical Object Masks Are Outer-Validity Only
+
+For numerical object encodings such as `FixedSizeList<T>(D) -> ArrayView2<T>`, the masked ingress
+API may expose the outer row-validity bitmap only. Actual inner component nulls are rejected on
+inbound conversion because a component-level null mask is not part of the ndarray view contract.
+
+This means:
+
+1. outer row nulls are admissible on the masked path
+2. inner primitive nulls remain invalid for the admitted numerical object contract
+3. callers that need element-level null semantics must stay in Arrow space or use an explicit
+   allocating helper
+
+**Rationale**: A single `ArrayView2<T>` plus one outer bitmap cannot faithfully represent both row
+absence and per-component nullity. Rejecting inner nulls preserves denotational clarity and avoids
+silently wrong numerical views.
 
 ## Ownership and Lifetime
 
@@ -217,6 +269,9 @@ Currently defined:
 - `ndarrow.csr_matrix` — CSR sparse matrix
 - `ndarrow.complex32` — complex32 scalar column (real/imag pair)
 - `ndarrow.complex64` — complex64 scalar column (real/imag pair)
+
+Higher-rank complex matrices/tensors are represented by composing these scalar element encodings
+inside canonical dense carriers rather than by defining separate extension families.
 
 Custom types implement the `ExtensionType` trait from `arrow_schema::extension` with proper
 serialization, deserialization, and validation.

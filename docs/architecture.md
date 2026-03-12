@@ -28,6 +28,30 @@ ndarrow/
 The implementation currently uses single-file modules per capability area. Submodule splits can be
 introduced later if code volume requires.
 
+## Concept-First Carrier Rule
+
+Bridge design is concept-first:
+
+1. the primary unit is the mathematical object family, not the incidental Arrow container shape
+2. each family should have one canonical standalone ingress and one canonical `rows-of-X` batch
+   carrier
+3. standalone batch workflows should prefer the same `rows-of-X` carriers that downstream systems
+   such as `ndatafusion` will use
+
+## Checkpoint 1 Carrier Closure
+
+Checkpoint 1 is now closed under the concept-family carrier rule:
+
+1. `rows-of-sparse-matrices` are represented by `ndarrow.csr_matrix_batch`
+2. complex ragged tensors use canonical `arrow.variable_shape_tensor<ndarrow.complex*>`
+3. each admitted family now has an explicit standalone and/or `rows-of-X` bridge contract
+4. the new carriers meet the same bar as the rest of the bridge surface:
+   - zero-copy ingress where structurally possible
+   - explicit outbound constructors
+   - documented invariants
+   - integration / pointer-identity coverage
+   - no regressions to existing dense, sparse-vector, tensor, or fixed-layout complex paths
+
 ## Trait Hierarchy
 
 ### NdarrowElement
@@ -80,6 +104,10 @@ Implemented for:
 - `FixedShapeTensor` arrays -> `ArrayViewD<T::Native>`
 - `VariableShapeTensor` arrays -> per-row `ArrayViewD<T::Native>` (via iterator)
 
+For numerical object encodings such as `FixedSizeList<T>(D)`, the masked path only carries outer
+row validity. Inner component nulls are rejected because they cannot be represented faithfully by
+an `ArrayView2<T>` plus a single outer mask.
+
 ### IntoArrow (Outbound)
 
 Converts owned ndarray arrays to Arrow arrays via ownership transfer.
@@ -109,8 +137,12 @@ Implemented for:
 | `arrow.fixed_shape_tensor`          | `ArrayViewD<T::Native>`   | Zero  | Borrow flat buffer + shape   |
 | `arrow.variable_shape_tensor`       | Per-row `ArrayViewD`      | Zero  | Borrow slice per element     |
 | `ndarrow.csr_matrix`                 | `CsrView` / equivalent   | Zero  | Borrow offsets + indices + values |
+| `ndarrow.csr_matrix_batch`          | Per-row `CsrView`        | Zero  | Borrow nested offsets + values per row |
 | `ndarrow.complex32`                 | `ArrayView1<Complex32>`   | Zero  | Borrow pair buffer + reinterpret |
 | `ndarrow.complex64`                 | `ArrayView1<Complex64>`   | Zero  | Borrow pair buffer + reinterpret |
+| `FixedSizeList<ndarrow.complex*>(D)` | `ArrayView2<Complex*>`   | Zero  | Borrow nested pair buffer + reshape |
+| `arrow.fixed_shape_tensor<ndarrow.complex*>` | `ArrayViewD<Complex*>` | Zero | Borrow nested pair buffer + shape |
+| `arrow.variable_shape_tensor<ndarrow.complex*>` | Per-row `ArrayViewD<Complex*>` | Zero | Borrow nested pair buffer + shape per row |
 | Two-column sparse (indices+values)  | `CsrView` / equivalent   | Zero  | Borrow from both columns     |
 
 ### Outbound (ndarray -> Arrow)
@@ -123,6 +155,13 @@ Implemented for:
 | Sparse owned        | `ndarrow.csr_matrix`                 | Zero* | Transfer row_ptrs, indices, values |
 | `Array1<Complex32>` | `ndarrow.complex32`                  | Zero* | Transfer pair buffer ownership     |
 | `Array1<Complex64>` | `ndarrow.complex64`                  | Zero* | Transfer pair buffer ownership     |
+| `Array2<Complex32>` | `FixedSizeList<ndarrow.complex32>`   | Zero* | Flatten rows, reuse scalar complex carrier |
+| `Array2<Complex64>` | `FixedSizeList<ndarrow.complex64>`   | Zero* | Flatten rows, reuse scalar complex carrier |
+| `ArrayD<Complex32>` | `arrow.fixed_shape_tensor<ndarrow.complex32>` | Zero* | Batch axis + canonical tensor metadata |
+| `ArrayD<Complex64>` | `arrow.fixed_shape_tensor<ndarrow.complex64>` | Zero* | Batch axis + canonical tensor metadata |
+| Batched CSR matrices | `ndarrow.csr_matrix_batch` | Zero* | Transfer nested row_ptrs / indices / values |
+| `Vec<ArrayD<Complex32>>` | `arrow.variable_shape_tensor<ndarrow.complex32>` | Alloc | Pack ragged rows + reuse scalar carrier |
+| `Vec<ArrayD<Complex64>>` | `arrow.variable_shape_tensor<ndarrow.complex64>` | Alloc | Pack ragged rows + reuse scalar carrier |
 
 \* Zero-copy if standard layout. Allocates `as_standard_layout()` copy if not.
 
@@ -205,6 +244,11 @@ in `extensions.rs` via `deserialize_registered_extension`.
   - Metadata: none
   - Validation: fixed-size list length is exactly 2; inner primitive type must match
   - ndarray mapping: borrowed `ArrayView1<Complex32>` / `ArrayView1<Complex64>`
+  - Higher-rank composition:
+    - complex matrices use nested `FixedSizeList<ndarrow.complex*>(D)`
+    - complex fixed-shape tensors use canonical `arrow.fixed_shape_tensor` over the complex element carrier
+    - complex variable-shape tensors use canonical `arrow.variable_shape_tensor` over the
+      complex element carrier
 
 ## Sparse Representation
 

@@ -11,7 +11,7 @@ use arrow_schema::{
 use crate::{
     complex::{Complex32Extension, Complex64Extension},
     error::NdarrowError,
-    sparse::CsrMatrixExtension,
+    sparse::{CsrMatrixBatchExtension, CsrMatrixExtension},
     tensor::{parse_fixed_shape_extension, parse_variable_shape_extension},
 };
 
@@ -20,6 +20,8 @@ use crate::{
 pub enum RegisteredExtension {
     /// `ndarrow.csr_matrix`
     CsrMatrix(CsrMatrixExtension),
+    /// `ndarrow.csr_matrix_batch`
+    CsrMatrixBatch(CsrMatrixBatchExtension),
     /// `arrow.fixed_shape_tensor`
     FixedShapeTensor(FixedShapeTensor),
     /// `arrow.variable_shape_tensor`
@@ -36,6 +38,7 @@ impl RegisteredExtension {
     pub fn name(&self) -> &'static str {
         match self {
             Self::CsrMatrix(_) => CsrMatrixExtension::NAME,
+            Self::CsrMatrixBatch(_) => CsrMatrixBatchExtension::NAME,
             Self::FixedShapeTensor(_) => FixedShapeTensor::NAME,
             Self::VariableShapeTensor(_) => VariableShapeTensor::NAME,
             Self::Complex32(_) => Complex32Extension::NAME,
@@ -49,6 +52,7 @@ impl RegisteredExtension {
 pub fn registered_extension_names() -> &'static [&'static str] {
     &[
         CsrMatrixExtension::NAME,
+        CsrMatrixBatchExtension::NAME,
         FixedShapeTensor::NAME,
         VariableShapeTensor::NAME,
         Complex32Extension::NAME,
@@ -79,6 +83,10 @@ pub fn deserialize_registered_extension(
             .try_extension_type::<CsrMatrixExtension>()
             .map(RegisteredExtension::CsrMatrix)
             .map_err(NdarrowError::from),
+        CsrMatrixBatchExtension::NAME => field
+            .try_extension_type::<CsrMatrixBatchExtension>()
+            .map(RegisteredExtension::CsrMatrixBatch)
+            .map_err(NdarrowError::from),
         FixedShapeTensor::NAME => {
             parse_fixed_shape_extension(field).map(RegisteredExtension::FixedShapeTensor)
         }
@@ -107,7 +115,10 @@ mod tests {
     use ndarray::{ArrayD, IxDyn};
 
     use super::*;
-    use crate::{sparse::csr_to_extension_array, tensor::arrays_to_variable_shape_tensor};
+    use crate::{
+        sparse::{csr_batch_to_extension_array, csr_to_extension_array},
+        tensor::arrays_to_variable_shape_tensor,
+    };
 
     fn field_with_extension_name(name: &str, data_type: DataType) -> Field {
         let mut metadata = HashMap::new();
@@ -119,6 +130,7 @@ mod tests {
     fn registered_extension_names_include_expected_entries() {
         let names = registered_extension_names();
         assert!(names.contains(&CsrMatrixExtension::NAME));
+        assert!(names.contains(&CsrMatrixBatchExtension::NAME));
         assert!(names.contains(&FixedShapeTensor::NAME));
         assert!(names.contains(&VariableShapeTensor::NAME));
         assert!(names.contains(&Complex32Extension::NAME));
@@ -199,6 +211,22 @@ mod tests {
             .expect("registered extension parsing should succeed");
         assert!(matches!(parsed, RegisteredExtension::CsrMatrix(_)));
         assert_eq!(parsed.name(), CsrMatrixExtension::NAME);
+    }
+
+    #[test]
+    fn deserialize_registered_extension_parses_csr_matrix_batch() {
+        let shapes = vec![[2_usize, 4_usize], [1_usize, 3_usize]];
+        let row_ptrs = vec![vec![0_i32, 1_i32, 2_i32], vec![0_i32, 1_i32]];
+        let col_indices = vec![vec![0_u32, 3_u32], vec![1_u32]];
+        let values = vec![vec![1.0_f32, 2.0_f32], vec![3.0_f32]];
+        let (field, _array) =
+            csr_batch_to_extension_array("csr_batch", shapes, row_ptrs, col_indices, values)
+                .expect("csr matrix batch construction should succeed");
+
+        let parsed = deserialize_registered_extension(&field)
+            .expect("registered extension parsing should succeed");
+        assert!(matches!(parsed, RegisteredExtension::CsrMatrixBatch(_)));
+        assert_eq!(parsed.name(), CsrMatrixBatchExtension::NAME);
     }
 
     #[test]

@@ -6,8 +6,12 @@
 pub use crate::{
     AsNdarray, IntoArrow, NdarrowElement, NdarrowError,
     complex::{
-        Complex32Extension, Complex64Extension, array1_complex32_to_extension,
-        array1_complex64_to_extension, complex32_as_array_view1, complex64_as_array_view1,
+        Complex32Extension, Complex32VariableShapeTensorIter, Complex64Extension,
+        Complex64VariableShapeTensorIter, array1_complex32_to_extension,
+        array1_complex64_to_extension, arrays_complex32_to_variable_shape_tensor,
+        arrays_complex64_to_variable_shape_tensor, complex32_as_array_view1,
+        complex32_variable_shape_tensor_iter, complex64_as_array_view1,
+        complex64_variable_shape_tensor_iter,
     },
     extensions::{
         RegisteredExtension, deserialize_registered_extension, registered_extension_names,
@@ -20,7 +24,8 @@ pub use crate::{
         to_standard_layout,
     },
     sparse::{
-        CsrMatrixExtension, CsrMatrixMetadata, CsrView, csr_to_extension_array,
+        CsrMatrixBatchExtension, CsrMatrixBatchIter, CsrMatrixExtension, CsrMatrixMetadata,
+        CsrView, csr_batch_to_extension_array, csr_matrix_batch_iter, csr_to_extension_array,
         csr_view_from_columns, csr_view_from_extension,
     },
     tensor::{

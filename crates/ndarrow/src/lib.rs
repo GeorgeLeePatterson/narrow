@@ -66,8 +66,15 @@ pub mod tensor;
 // ─── Re-exports ───
 
 pub use complex::{
-    Complex32Extension, Complex64Extension, array1_complex32_to_extension,
-    array1_complex64_to_extension, complex32_as_array_view1, complex64_as_array_view1,
+    Complex32Extension, Complex32VariableShapeTensorIter, Complex64Extension,
+    Complex64VariableShapeTensorIter, array1_complex32_to_extension, array1_complex64_to_extension,
+    array2_complex32_to_fixed_size_list, array2_complex64_to_fixed_size_list,
+    arrayd_complex32_to_fixed_shape_tensor, arrayd_complex64_to_fixed_shape_tensor,
+    arrays_complex32_to_variable_shape_tensor, arrays_complex64_to_variable_shape_tensor,
+    complex32_as_array_view1, complex32_as_array_view2,
+    complex32_fixed_shape_tensor_as_array_viewd, complex32_variable_shape_tensor_iter,
+    complex64_as_array_view1, complex64_as_array_view2,
+    complex64_fixed_shape_tensor_as_array_viewd, complex64_variable_shape_tensor_iter,
 };
 pub use element::NdarrowElement;
 pub use error::NdarrowError;
@@ -82,8 +89,9 @@ pub use inbound::{
 };
 pub use outbound::IntoArrow;
 pub use sparse::{
-    CsrMatrixExtension, CsrMatrixMetadata, CsrView, csr_to_extension_array, csr_view_from_columns,
-    csr_view_from_extension,
+    CsrMatrixBatchExtension, CsrMatrixBatchIter, CsrMatrixExtension, CsrMatrixMetadata, CsrView,
+    csr_batch_to_extension_array, csr_matrix_batch_iter, csr_to_extension_array,
+    csr_view_from_columns, csr_view_from_extension,
 };
 pub use tensor::{
     VariableShapeTensorIter, arrayd_to_fixed_shape_tensor, arrays_to_variable_shape_tensor,

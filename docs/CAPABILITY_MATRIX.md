@@ -18,8 +18,15 @@
 | FixedSizeList<f64> -> ArrayView2    | Done   | Implemented (`validated`/`unchecked`/`masked`) |
 | FixedShapeTensor -> ArrayViewD      | Done   | `fixed_shape_tensor_as_array_viewd`          |
 | VariableShapeTensor -> per-row view | Done   | `variable_shape_tensor_iter` iterator        |
+| FixedSizeList<complex32> -> ArrayView2 | Done | `complex32_as_array_view2`                   |
+| FixedSizeList<complex64> -> ArrayView2 | Done | `complex64_as_array_view2`                   |
+| FixedShapeTensor<complex32> -> ArrayViewD | Done | `complex32_fixed_shape_tensor_as_array_viewd` |
+| FixedShapeTensor<complex64> -> ArrayViewD | Done | `complex64_fixed_shape_tensor_as_array_viewd` |
 | ndarrow.csr_matrix -> CsrView       | Done   | `csr_view_from_extension`                    |
 | Two-column sparse -> CsrView        | Done   | `csr_view_from_columns` convenience path     |
+| ndarrow.csr_matrix_batch -> per-row CsrView | Done | `csr_matrix_batch_iter` |
+| VariableShapeTensor<complex32> -> per-row ArrayViewD | Done | `complex32_variable_shape_tensor_iter` |
+| VariableShapeTensor<complex64> -> per-row ArrayViewD | Done | `complex64_variable_shape_tensor_iter` |
 
 ## Outbound: ndarray -> Arrow (Ownership Transfer)
 
@@ -31,7 +38,14 @@
 | Array2<f64> -> FixedSizeList        | Done   | Implemented via `IntoArrow`                  |
 | ArrayD<T> -> FixedShapeTensor       | Done   | `arrayd_to_fixed_shape_tensor`               |
 | ArrayD<T> rows -> VariableShapeTensor | Done | `arrays_to_variable_shape_tensor`            |
+| Array2<Complex32> -> FixedSizeList<complex32> | Done | `array2_complex32_to_fixed_size_list` |
+| Array2<Complex64> -> FixedSizeList<complex64> | Done | `array2_complex64_to_fixed_size_list` |
+| ArrayD<Complex32> -> FixedShapeTensor<complex32> | Done | `arrayd_complex32_to_fixed_shape_tensor` |
+| ArrayD<Complex64> -> FixedShapeTensor<complex64> | Done | `arrayd_complex64_to_fixed_shape_tensor` |
 | CsrMatrix-like -> ndarrow.csr_matrix | Done  | `csr_to_extension_array`                     |
+| Sparse matrix batch owned -> ndarrow.csr_matrix_batch | Done | `csr_batch_to_extension_array` |
+| ArrayD<Complex32> rows -> VariableShapeTensor<complex32> | Done | `arrays_complex32_to_variable_shape_tensor` |
+| ArrayD<Complex64> rows -> VariableShapeTensor<complex64> | Done | `arrays_complex64_to_variable_shape_tensor` |
 
 ## Null Handling
 
@@ -39,7 +53,7 @@
 |-------------------------------------|--------|----------------------------------------------|
 | Validated (null_count check)        | Done   | Default tier, returns Result                 |
 | Unchecked (caller guarantees)       | Done   | Zero-cost, unsafe                            |
-| Masked (view + validity bitmap)     | Done   | Returns tuple, zero allocation               |
+| Masked (view + validity bitmap)     | Done   | Returns tuple, zero allocation; numerical object masks are outer-row only |
 | fill_nulls(zero)                    | Done   | `helpers::fill_nulls_with_zero`              |
 | fill_nulls(mean)                    | Done   | `helpers::fill_nulls_with_mean` (float types) |
 | compact_non_null                    | Done   | `helpers::compact_non_null`                  |
@@ -62,6 +76,7 @@
 | arrow.fixed_shape_tensor support    | Done   | Inbound + outbound implemented               |
 | arrow.variable_shape_tensor support | Done   | Inbound iterator + outbound implemented      |
 | ndarrow.csr_matrix definition       | Done   | `CsrMatrixExtension` implemented             |
+| ndarrow.csr_matrix_batch definition | Done   | `CsrMatrixBatchExtension` implemented        |
 | ndarrow.complex32 definition        | Done   | `Complex32Extension` implemented             |
 | ndarrow.complex64 definition        | Done   | `Complex64Extension` implemented             |
 | Extension type registration         | Done   | `deserialize_registered_extension` registry  |
@@ -72,8 +87,8 @@
 |------------|---------|----------|-------------------------------------|
 | f32        | Done    | Done     | First-class, primary                |
 | f64        | Done    | Done     | First-class, primary                |
-| Complex32  | Done    | Done     | Via `ndarrow.complex32` extension APIs |
-| Complex64  | Done    | Done     | Via `ndarrow.complex64` extension APIs |
+| Complex32  | Done    | Done     | Scalar, matrix, fixed-shape tensor, and variable-shape tensor carriers implemented |
+| Complex64  | Done    | Done     | Scalar, matrix, fixed-shape tensor, and variable-shape tensor carriers implemented |
 | i32        | --      | --       | Future, for index arrays            |
 | i64        | --      | --       | Future, for index arrays            |
 | u32        | --      | --       | Future, for sparse indices          |
