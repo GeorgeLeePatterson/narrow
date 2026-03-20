@@ -6,7 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Addresses missing public apis around null handling, batch focused paths
+
+## [0.0.3] - 2026-03-12
+
+### Bug Fixes
+
 - Expands public apis to support more complex, row-based arrays
+
+### Miscellaneous Tasks
+
+- Prepare release v0.0.3 (#15)
 
 ## [0.0.2] - 2026-03-05
 

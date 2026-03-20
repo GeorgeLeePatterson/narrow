@@ -1,7 +1,7 @@
-## [0.0.3] - 2026-03-12
+## [0.0.4] - 2026-03-20
 
 ### Bug Fixes
 
-- Expands public apis to support more complex, row-based arrays
+- Addresses missing public apis around null handling, batch focused paths
 
 

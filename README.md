@@ -16,7 +16,7 @@ allocation overhead.
 
 ```toml
 [dependencies]
-ndarrow = "0.0.3"
+ndarrow = "0.0.4"
 ```
 
 ## What It Does
